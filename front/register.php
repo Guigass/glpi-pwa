@@ -63,42 +63,93 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 
 // Validar CSRF token - CRÍTICO: deve ser feito antes de qualquer outra operação
 // O GLPI 11 tem um listener do Symfony que verifica CSRF automaticamente
-// Aceitar token tanto do body JSON quanto do header HTTP
-$csrfToken = $data['_glpi_csrf_token'] ?? '';
-if (empty($csrfToken)) {
-    // Tentar obter do header HTTP (padrão do GLPI 11)
-    $csrfToken = $_SERVER['HTTP_X_GLPI_CSRF_TOKEN'] ?? '';
-}
-if (empty($csrfToken)) {
-    // Tentar obter do header alternativo
-    $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+// Aceitar token tanto do body JSON quanto do header HTTP ou $_POST
+$csrfToken = null;
+
+// Tentar obter do body JSON primeiro
+if (isset($data['_glpi_csrf_token']) && !empty($data['_glpi_csrf_token'])) {
+    $csrfToken = $data['_glpi_csrf_token'];
 }
 
+// Tentar obter do $_POST (caso venha como form-data)
+if (empty($csrfToken) && isset($_POST['_glpi_csrf_token']) && !empty($_POST['_glpi_csrf_token'])) {
+    $csrfToken = $_POST['_glpi_csrf_token'];
+}
+
+// Tentar obter do header HTTP (padrão do GLPI 11)
+if (empty($csrfToken)) {
+    // Função auxiliar para obter headers (getallheaders pode não estar disponível em todos os ambientes)
+    $headers = [];
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+    } else {
+        // Fallback: construir array de headers a partir de $_SERVER
+        foreach ($_SERVER as $key => $value) {
+            if (strpos($key, 'HTTP_') === 0) {
+                $headerName = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
+                $headers[$headerName] = $value;
+            }
+        }
+    }
+    
+    if (isset($headers['X-GLPI-CSRF-TOKEN']) && !empty($headers['X-GLPI-CSRF-TOKEN'])) {
+        $csrfToken = $headers['X-GLPI-CSRF-TOKEN'];
+    } elseif (isset($headers['X-Glpi-Csrf-Token']) && !empty($headers['X-Glpi-Csrf-Token'])) {
+        $csrfToken = $headers['X-Glpi-Csrf-Token'];
+    } elseif (isset($_SERVER['HTTP_X_GLPI_CSRF_TOKEN']) && !empty($_SERVER['HTTP_X_GLPI_CSRF_TOKEN'])) {
+        $csrfToken = $_SERVER['HTTP_X_GLPI_CSRF_TOKEN'];
+    }
+}
+
+// Tentar obter do header alternativo
+if (empty($csrfToken) && isset($_SERVER['HTTP_X_CSRF_TOKEN']) && !empty($_SERVER['HTTP_X_CSRF_TOKEN'])) {
+    $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'];
+}
+
+// Validar o token se encontrado
 if (!empty($csrfToken)) {
-    // Colocar no $_POST para que o listener do Symfony encontre
-    $_POST['_glpi_csrf_token'] = $csrfToken;
+    // Colocar no $_POST para que o listener do Symfony encontre (se ainda não estiver)
+    if (!isset($_POST['_glpi_csrf_token'])) {
+        $_POST['_glpi_csrf_token'] = $csrfToken;
+    }
+    
     // Validar explicitamente
     if (!Session::validateCSRF(['_glpi_csrf_token' => $csrfToken])) {
+        // Log detalhado para debug
+        if (class_exists('Toolbox')) {
+            Toolbox::logWarning('GLPIPWA: CSRF token inválido. UserID: ' . Session::getLoginUserID() . ', Token recebido: ' . substr($csrfToken, 0, 20) . '...');
+        }
         http_response_code(403);
         echo json_encode([
             'success' => false,
             'error' => 'Token de segurança inválido',
             'title' => 'Acesso negado',
-            'message' => 'A ação que você requisitou não é permitida.'
+            'message' => 'A ação que você requisitou não é permitida. Por favor, recarregue a página e tente novamente.'
         ]);
         exit;
     }
 } else {
-    // CSRF token ausente - bloquear para segurança
-    // No entanto, se o usuário está autenticado e a requisição vem do mesmo domínio,
-    // podemos ser mais permissivos para endpoints que não são críticos
-    // Mas para manter segurança, vamos requerer o token
+    // CSRF token ausente - log detalhado e bloquear
+    if (class_exists('Toolbox')) {
+        $headersForLog = [];
+        if (function_exists('getallheaders')) {
+            $headersForLog = getallheaders();
+        } else {
+            foreach ($_SERVER as $key => $value) {
+                if (strpos($key, 'HTTP_') === 0) {
+                    $headerName = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
+                    $headersForLog[$headerName] = $value;
+                }
+            }
+        }
+        Toolbox::logWarning('GLPIPWA: CSRF token ausente. UserID: ' . Session::getLoginUserID() . ', Method: ' . $_SERVER['REQUEST_METHOD'] . ', Headers: ' . json_encode($headersForLog));
+    }
     http_response_code(403);
     echo json_encode([
         'success' => false,
         'error' => 'Token de segurança ausente',
         'title' => 'Acesso negado',
-        'message' => 'Token de segurança CSRF não fornecido.'
+        'message' => 'Token de segurança CSRF não fornecido. Por favor, recarregue a página e tente novamente.'
     ]);
     exit;
 }

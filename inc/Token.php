@@ -136,10 +136,32 @@ class PluginGlpipwaToken extends CommonDBTM
     {
         global $DB;
 
+        // Filtrar e validar IDs de usuários antes de executar a query
+        $valid_users_ids = [];
+        foreach ($users_ids as $user_id) {
+            // Verificar se é numérico e maior que zero
+            // Rejeitar strings como 'N/A', null, false, arrays, etc.
+            if (is_numeric($user_id)) {
+                $user_id = (int)$user_id;
+                if ($user_id > 0) {
+                    $valid_users_ids[] = $user_id;
+                }
+            }
+        }
+        
+        // Remover duplicatas
+        $valid_users_ids = array_unique($valid_users_ids);
+        
+        // Se não houver IDs válidos, retornar array vazio
+        if (empty($valid_users_ids)) {
+            Toolbox::logWarning("GLPI PWA: Nenhum ID de usuário válido fornecido para getUsersTokens. IDs originais: " . implode(', ', $users_ids));
+            return [];
+        }
+
         $tokens = [];
         $iterator = $DB->request([
             'FROM' => self::getTable(),
-            'WHERE' => ['users_id' => $users_ids],
+            'WHERE' => ['users_id' => $valid_users_ids],
         ]);
 
         foreach ($iterator as $row) {
