@@ -190,7 +190,26 @@ $success = true;
 $compiled = 0;
 
 foreach ($poFiles as $poFile) {
-    $moFile = preg_replace('/\.po$/', '.mo', $poFile);
+    // Extrair o locale do nome do arquivo (ex: pt_BR.po -> pt_BR)
+    $basename = basename($poFile, '.po');
+    
+    // Ignorar arquivos que não são de locale (ex: glpipwa.pot)
+    if ($basename === 'glpipwa') {
+        continue;
+    }
+    
+    // Criar estrutura de diretórios: locale/{locale}/LC_MESSAGES/
+    $localeSubDir = $localeDir . '/' . $basename . '/LC_MESSAGES';
+    if (!is_dir($localeSubDir)) {
+        if (!mkdir($localeSubDir, 0755, true)) {
+            echo "Erro ao criar diretório: $localeSubDir\n";
+            $success = false;
+            continue;
+        }
+    }
+    
+    // Gerar arquivo .mo na estrutura correta: locale/{locale}/LC_MESSAGES/glpipwa.mo
+    $moFile = $localeSubDir . '/glpipwa.mo';
     
     echo "Compilando: " . basename($poFile) . "...\n";
     

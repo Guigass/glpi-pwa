@@ -175,7 +175,7 @@ const localeDir = path.join(baseDir, 'locale');
 try {
     // Encontrar todos os arquivos .po
     const files = fs.readdirSync(localeDir);
-    const poFiles = files.filter(f => f.endsWith('.po'));
+    const poFiles = files.filter(f => f.endsWith('.po') && f !== 'glpipwa.pot');
     
     if (poFiles.length === 0) {
         console.error(`Nenhum arquivo PO encontrado em: ${localeDir}`);
@@ -185,8 +185,24 @@ try {
     let compiled = 0;
     
     for (const poFileName of poFiles) {
+        // Extrair o locale do nome do arquivo (ex: pt_BR.po -> pt_BR)
+        const basename = path.basename(poFileName, '.po');
+        
+        // Ignorar arquivos que não são de locale (ex: glpipwa.pot)
+        if (basename === 'glpipwa') {
+            continue;
+        }
+        
         const poFile = path.join(localeDir, poFileName);
-        const moFile = poFile.replace(/\.po$/, '.mo');
+        
+        // Criar estrutura de diretórios: locale/{locale}/LC_MESSAGES/
+        const localeSubDir = path.join(localeDir, basename, 'LC_MESSAGES');
+        if (!fs.existsSync(localeSubDir)) {
+            fs.mkdirSync(localeSubDir, { recursive: true });
+        }
+        
+        // Gerar arquivo .mo na estrutura correta: locale/{locale}/LC_MESSAGES/glpipwa.mo
+        const moFile = path.join(localeSubDir, 'glpipwa.mo');
         
         console.log(`Compilando: ${poFileName}...`);
         
@@ -196,7 +212,7 @@ try {
         
         fs.writeFileSync(moFile, moBuffer);
         
-        console.log(`  -> ${path.basename(moFile)} (${Object.keys(entries).length} strings)`);
+        console.log(`  -> ${path.relative(localeDir, moFile)} (${Object.keys(entries).length} strings)`);
         compiled++;
     }
     

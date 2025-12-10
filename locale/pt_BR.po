@@ -142,7 +142,7 @@ msgid "Ticket opened by %s - Urgency: %s"
 msgstr "Chamado aberto por %s - Urgência: %s"
 
 msgid "Ticket #%d Updated"
-msgstr "Atualização no Chamado #%d"
+msgstr "Chamado #%d Atualizado"
 
 msgid "The ticket has been updated"
 msgstr "O chamado foi atualizado"
