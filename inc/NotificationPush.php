@@ -119,10 +119,18 @@ class PluginGlpipwaNotificationPush
      */
     public function sendToUsers(array $users_ids, $title, $body, $data = [])
     {
-        $usersTokens = PluginGlpipwaToken::getUsersTokens($users_ids);
+        // Filtrar e validar IDs de usuários antes de buscar tokens
+        $valid_users_ids = $this->filterValidUserIds($users_ids);
+        
+        if (empty($valid_users_ids)) {
+            Toolbox::logDebug("GLPI PWA: Nenhum ID de usuário válido fornecido. IDs originais: " . implode(', ', $users_ids));
+            return false;
+        }
+        
+        $usersTokens = PluginGlpipwaToken::getUsersTokens($valid_users_ids);
         
         if (empty($usersTokens)) {
-            Toolbox::logDebug("GLPI PWA: Nenhum token encontrado para os usuários: " . implode(', ', $users_ids));
+            Toolbox::logDebug("GLPI PWA: Nenhum token encontrado para os usuários: " . implode(', ', $valid_users_ids));
             return false;
         }
 
@@ -383,9 +391,12 @@ class PluginGlpipwaNotificationPush
         
         // Remover o autor do follow-up dos destinatários
         $author_id = $followup->getField('users_id');
-        $recipients = array_filter($recipients, function($id) use ($author_id) {
-            return $id != $author_id;
-        });
+        if ($this->isValidUserId($author_id)) {
+            $author_id = (int)$author_id;
+            $recipients = array_filter($recipients, function($id) use ($author_id) {
+                return $id != $author_id;
+            });
+        }
 
         if (empty($recipients)) {
             return;
@@ -416,6 +427,41 @@ class PluginGlpipwaNotificationPush
     }
 
     /**
+     * Valida se um valor é um ID de usuário válido
+     * 
+     * @param mixed $user_id Valor a ser validado
+     * @return bool True se for um ID válido, False caso contrário
+     */
+    private function isValidUserId($user_id)
+    {
+        // Verificar se é numérico e maior que zero
+        // Rejeitar strings como 'N/A', null, false, arrays, etc.
+        if (!is_numeric($user_id)) {
+            return false;
+        }
+        
+        $user_id = (int)$user_id;
+        return $user_id > 0;
+    }
+
+    /**
+     * Filtra e valida um array de IDs de usuários
+     * 
+     * @param array $user_ids Array de IDs a serem validados
+     * @return array Array contendo apenas IDs válidos como inteiros
+     */
+    private function filterValidUserIds(array $user_ids)
+    {
+        $valid_ids = [];
+        foreach ($user_ids as $id) {
+            if ($this->isValidUserId($id)) {
+                $valid_ids[] = (int)$id;
+            }
+        }
+        return array_unique($valid_ids);
+    }
+
+    /**
      * Obtém destinatários de notificação para um ticket
      * 
      * @param Ticket $ticket O ticket para obter destinatários
@@ -428,8 +474,8 @@ class PluginGlpipwaNotificationPush
 
         // Técnico designado
         $tech_id = $ticket->getField('users_id_tech');
-        if ($tech_id > 0) {
-            $recipients[] = $tech_id;
+        if ($this->isValidUserId($tech_id)) {
+            $recipients[] = (int)$tech_id;
         }
 
         // Grupo técnico
@@ -440,7 +486,10 @@ class PluginGlpipwaNotificationPush
                 if ($group->getFromDB($tech_group)) {
                     $groupUsers = Group_User::getGroupUsers($tech_group);
                     foreach ($groupUsers as $user) {
-                        $recipients[] = $user['id'];
+                        $user_id = $user['id'] ?? null;
+                        if ($this->isValidUserId($user_id)) {
+                            $recipients[] = (int)$user_id;
+                        }
                     }
                 }
             } catch (Exception $e) {
@@ -457,7 +506,10 @@ class PluginGlpipwaNotificationPush
                     'type' => CommonITILActor::OBSERVER
                 ]);
                 foreach ($observers as $obs) {
-                    $recipients[] = $obs['users_id'];
+                    $user_id = $obs['users_id'] ?? null;
+                    if ($this->isValidUserId($user_id)) {
+                        $recipients[] = (int)$user_id;
+                    }
                 }
             } catch (Exception $e) {
                 // Silenciosamente ignora erros
@@ -473,7 +525,10 @@ class PluginGlpipwaNotificationPush
                     'type' => CommonITILActor::REQUESTER
                 ]);
                 foreach ($requesters as $req) {
-                    $recipients[] = $req['users_id'];
+                    $user_id = $req['users_id'] ?? null;
+                    if ($this->isValidUserId($user_id)) {
+                        $recipients[] = (int)$user_id;
+                    }
                 }
             } catch (Exception $e) {
                 // Silenciosamente ignora erros
@@ -488,14 +543,16 @@ class PluginGlpipwaNotificationPush
         if ($isNewTicket) {
             // users_id_recipient é quem criou o registro no sistema
             $creator_id = $ticket->getField('users_id_recipient');
-            if ($creator_id > 0) {
+            if ($this->isValidUserId($creator_id)) {
+                $creator_id = (int)$creator_id;
                 $recipients = array_filter($recipients, function($id) use ($creator_id) {
                     return $id != $creator_id;
                 });
             }
         }
 
-        return array_values($recipients);
+        // Filtrar novamente para garantir que todos os valores são válidos
+        return $this->filterValidUserIds($recipients);
     }
 }
 
