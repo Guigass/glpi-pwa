@@ -38,14 +38,17 @@ Este projeto é desenvolvido usando **vibe coding**.
 
 1. Crie um projeto no [Firebase Console](https://console.firebase.google.com)
 2. Adicione um app Web ao projeto
-3. Obtenha as credenciais:
+3. Obtenha as credenciais básicas:
    - API Key
    - Project ID
    - Messaging Sender ID
    - App ID
    - VAPID Key (em Cloud Messaging > Web Push)
-   - Server Key (em Cloud Messaging > Server Key)
-4. Insira essas credenciais na página de configuração do plugin
+4. Configure o Service Account para FCM v1:
+   - Acesse **Configurações do Projeto > Contas de Serviço**
+   - Clique em **Gerar nova chave privada**
+   - Baixe o arquivo JSON da conta de serviço
+5. Na página de configuração do plugin, faça upload do arquivo JSON da conta de serviço
 
 ### PWA
 
@@ -85,7 +88,8 @@ glpipwa/
 ├── inc/                            # Classes PHP (Backend)
 │   ├── Config.php                  # Gerenciamento de configurações
 │   ├── Token.php                   # Gerenciamento de tokens FCM
-│   ├── NotificationPush.php        # Envio de notificações via FCM
+│   ├── FirebaseAuth.php            # Autenticação OAuth2 com Service Account (FCM v1)
+│   ├── NotificationPush.php        # Envio de notificações via FCM v1
 │   ├── Manifest.php                # Geração do manifest.json
 │   └── Icon.php                    # Upload e processamento de ícones
 │
@@ -144,7 +148,12 @@ glpipwa/
 │  NotificationPush.php                                       │
 │  ├── Identifica destinatários                               │
 │  ├── Busca tokens na tabela glpi_plugin_glpipwa_tokens      │
-│  └── Envia para Firebase FCM                                │
+│  └── Envia para Firebase FCM v1 API                         │
+├─────────────────────────────────────────────────────────────┤
+│  FirebaseAuth.php                                           │
+│  ├── Gera JWT assinado com Service Account                  │
+│  ├── Obtém access token OAuth2                              │
+│  └── Cache de tokens (1 hora)                               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼

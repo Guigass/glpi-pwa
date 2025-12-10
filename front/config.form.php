@@ -53,9 +53,26 @@ if (isset($_POST['update'])) {
     $config['firebase_messaging_sender_id'] = trim($_POST['firebase_messaging_sender_id'] ?? '');
     $config['firebase_app_id'] = trim($_POST['firebase_app_id'] ?? '');
     $config['firebase_vapid_key'] = trim($_POST['firebase_vapid_key'] ?? '');
-    // Server key só atualiza se fornecido (não limpa se vazio)
-    if (!empty($_POST['firebase_server_key'])) {
-        $config['firebase_server_key'] = trim($_POST['firebase_server_key']);
+    
+    // Service Account - processar upload de JSON
+    if (isset($_FILES['firebase_service_account_json']) && $_FILES['firebase_service_account_json']['error'] === UPLOAD_ERR_OK) {
+        $jsonContent = file_get_contents($_FILES['firebase_service_account_json']['tmp_name']);
+        $jsonData = json_decode($jsonContent, true);
+        
+        if ($jsonData && isset($jsonData['client_email']) && isset($jsonData['private_key'])) {
+            // Validar formato
+            if (filter_var($jsonData['client_email'], FILTER_VALIDATE_EMAIL)) {
+                $config['firebase_service_account_json'] = $jsonContent;
+            } else {
+                Session::addMessageAfterRedirect(__('Invalid Service Account JSON: invalid email', 'glpipwa'), true, ERROR);
+            }
+        } else {
+            Session::addMessageAfterRedirect(__('Invalid Service Account JSON format', 'glpipwa'), true, ERROR);
+        }
+    } else {
+        // Se não foi feito upload, manter o JSON existente (não limpar)
+        $currentConfig = PluginGlpipwaConfig::getAll();
+        $config['firebase_service_account_json'] = $currentConfig['firebase_service_account_json'] ?? '';
     }
     
     // PWA - sanitizar inputs
@@ -179,9 +196,13 @@ echo "<td>" . __('VAPID Key', 'glpipwa') . "</td>";
 echo "<td><input type='text' name='firebase_vapid_key' value='" . htmlspecialchars($config['firebase_vapid_key'] ?? '') . "' size='60'></td>";
 echo "</tr>";
 
+// Seção Service Account
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Firebase Service Account (FCM v1)', 'glpipwa') . "</th></tr>";
+
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Server Key', 'glpipwa') . "</td>";
-echo "<td><input type='password' name='firebase_server_key' value='" . htmlspecialchars($config['firebase_server_key'] ?? '') . "' size='60'></td>";
+echo "<td>" . __('Service Account JSON File', 'glpipwa') . "</td>";
+echo "<td><input type='file' name='firebase_service_account_json' accept='application/json'><br>";
+echo "<small>" . __('Upload the service account JSON file from Firebase Console', 'glpipwa') . "</small></td>";
 echo "</tr>";
 
 // Seção PWA

@@ -35,33 +35,33 @@ if (!defined('GLPI_ROOT')) {
 }
 
 /**
- * Classe para envio de notificações push via FCM
+ * Classe para envio de notificações push via FCM v1
  */
 class PluginGlpipwaNotificationPush
 {
-    const FCM_URL = 'https://fcm.googleapis.com/fcm/send';
-
     /**
      * Envia notificação para um token específico
      */
     public function send($token, $title, $body, $data = [])
     {
-        $serverKey = PluginGlpipwaConfig::get('firebase_server_key');
-        
-        if (empty($serverKey)) {
-            return false;
+        // Converter dados para strings (FCM v1 requer strings)
+        $dataStrings = [];
+        foreach ($data as $key => $value) {
+            $dataStrings[$key] = (string)$value;
         }
 
         $message = [
-            'notification' => [
-                'title' => $title,
-                'body' => $body,
+            'message' => [
+                'token' => $token,
+                'notification' => [
+                    'title' => $title,
+                    'body' => $body,
+                ],
+                'data' => $dataStrings,
             ],
-            'data' => $data,
-            'to' => $token,
         ];
 
-        return $this->sendToFCM($message);
+        return $this->sendToFCM($message, $token);
     }
 
     /**
@@ -105,22 +105,46 @@ class PluginGlpipwaNotificationPush
     }
 
     /**
-     * Envia requisição para FCM
+     * Envia requisição para FCM v1 API
+     * 
+     * @param array $message Payload no formato FCM v1
+     * @param string $token Token do dispositivo (para remoção em caso de erro)
+     * @param int $retryCount Contador de tentativas (para evitar loop infinito)
+     * @return array|false Resposta do FCM ou false em caso de erro
      */
-    private function sendToFCM(array $message)
+    private function sendToFCM(array $message, $token, $retryCount = 0)
     {
-        $serverKey = PluginGlpipwaConfig::get('firebase_server_key');
-        
-        if (empty($serverKey)) {
+        // Proteção contra loop infinito
+        if ($retryCount > 1) {
+            Toolbox::logError("GLPI PWA: Número máximo de tentativas excedido para envio FCM");
             return false;
         }
 
+        // Obter access token OAuth2
+        $accessToken = PluginGlpipwaFirebaseAuth::getAccessToken();
+        
+        if (!$accessToken) {
+            Toolbox::logError("GLPI PWA: Não foi possível obter access token OAuth2");
+            return false;
+        }
+
+        // Obter project ID
+        $projectId = PluginGlpipwaConfig::get('firebase_project_id');
+        
+        if (empty($projectId)) {
+            Toolbox::logError("GLPI PWA: Project ID não configurado");
+            return false;
+        }
+
+        // URL do endpoint FCM v1
+        $fcmUrl = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
         $headers = [
-            'Authorization: key=' . $serverKey,
+            'Authorization: Bearer ' . $accessToken,
             'Content-Type: application/json',
         ];
 
-        $ch = curl_init(self::FCM_URL);
+        $ch = curl_init($fcmUrl);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message));
@@ -133,39 +157,55 @@ class PluginGlpipwaNotificationPush
         curl_close($ch);
 
         if ($error) {
-            Toolbox::logError("FCM Error: " . $error);
-            return false;
-        }
-
-        if ($httpCode !== 200) {
-            Toolbox::logError("FCM HTTP Error: " . $httpCode . " - " . $result);
+            Toolbox::logError("GLPI PWA FCM Error: " . $error);
             return false;
         }
 
         $response = json_decode($result, true);
-        
-        // Verificar se o token é inválido
-        if (isset($response['results'][0]['error'])) {
-            $error = $response['results'][0]['error'];
-            // Lista de erros que indicam token inválido ou expirado
-            $invalidTokenErrors = [
-                'InvalidRegistration',      // Token mal formatado
-                'NotRegistered',            // Token não está mais registrado
-                'MismatchSenderId',         // Token registrado com outro sender
-                'InvalidPackageName',       // Nome do pacote inválido
-                'InvalidApnsCredential',    // Credenciais APNS inválidas (iOS)
-            ];
+
+        // Tratamento de erros FCM v1
+        if ($httpCode !== 200) {
+            $errorMessage = $response['error']['message'] ?? 'Unknown error';
+            $errorCode = $response['error']['code'] ?? 'UNKNOWN';
             
-            if (in_array($error, $invalidTokenErrors)) {
-                // Token inválido, remover do banco
-                if (isset($message['to'])) {
-                    PluginGlpipwaToken::deleteToken($message['to']);
-                    Toolbox::logDebug("GLPIPWA: Token removido devido a erro FCM: " . $error);
-                }
+            Toolbox::logError("GLPI PWA FCM HTTP Error: " . $httpCode . " - " . $errorCode . " - " . $errorMessage);
+
+            // Tratar erros específicos
+            switch ($errorCode) {
+                case 'UNAUTHENTICATED':
+                    // Token OAuth2 inválido, limpar cache e tentar novamente uma vez
+                    if ($retryCount === 0) {
+                        PluginGlpipwaFirebaseAuth::clearCache();
+                        $accessToken = PluginGlpipwaFirebaseAuth::getAccessToken();
+                        if ($accessToken) {
+                            // Tentar novamente com novo token
+                            return $this->sendToFCM($message, $token, $retryCount + 1);
+                        }
+                    }
+                    break;
+                
+                case 'NOT_FOUND':
+                case 'UNREGISTERED':
+                    // Token de dispositivo não encontrado ou não registrado
+                    PluginGlpipwaToken::deleteToken($token);
+                    Toolbox::logDebug("GLPI PWA: Token removido devido a erro FCM: " . $errorCode);
+                    break;
+                
+                case 'INVALID_ARGUMENT':
+                    // Payload ou token inválido
+                    Toolbox::logError("GLPI PWA: Argumento inválido no payload FCM");
+                    break;
+                
+                case 'PERMISSION_DENIED':
+                    // Service Account sem permissões
+                    Toolbox::logError("GLPI PWA: Service Account sem permissões para enviar mensagens FCM");
+                    break;
             }
+            
             return false;
         }
 
+        // Sucesso
         return $response;
     }
 

@@ -39,8 +39,23 @@ msgstr "App ID"
 msgid "VAPID Key"
 msgstr "VAPID Key"
 
-msgid "Server Key"
-msgstr "Server Key"
+msgid "Firebase Service Account (FCM v1)"
+msgstr "Firebase Service Account (FCM v1)"
+
+msgid "Service Account JSON File"
+msgstr "Service Account JSON File"
+
+msgid "Upload the service account JSON file from Firebase Console"
+msgstr "Upload the service account JSON file from Firebase Console"
+
+msgid "Invalid Service Account JSON: invalid email"
+msgstr "Invalid Service Account JSON: invalid email"
+
+msgid "Invalid Service Account JSON format"
+msgstr "Invalid Service Account JSON format"
+
+msgid "Invalid Service Account email format"
+msgstr "Invalid Service Account email format"
 
 msgid "Application Name"
 msgstr "Application Name"

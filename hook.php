@@ -150,12 +150,7 @@ function plugin_glpipwa_install() {
         // Criar tabela de tokens FCM usando Migration
         $table = 'glpi_plugin_glpipwa_tokens';
         
-        // Se a tabela já existe, dropar para recriar com a estrutura correta
-        if ($DB->tableExists($table)) {
-            $migration->displayMessage("Removendo tabela $table existente...");
-            $migration->dropTable($table);
-        }
-        
+        if (!$DB->tableExists($table)) {
             $migration->displayMessage("Criando tabela $table...");
             
             // Criar tabela usando SQL direto mas com tipos corretos para GLPI 11
@@ -174,15 +169,17 @@ function plugin_glpipwa_install() {
             
             $DB->doQuery($query);
             $migration->migrationOneTable($table);
+        }
 
-        // Configurações padrão
+        // Configurações padrão (apenas para chaves que não existem)
+        $existing = PluginGlpipwaConfig::getAll();
         $defaults = [
         'firebase_api_key' => '',
         'firebase_project_id' => '',
         'firebase_messaging_sender_id' => '',
         'firebase_app_id' => '',
         'firebase_vapid_key' => '',
-        'firebase_server_key' => '',
+        'firebase_service_account_json' => '',
         'pwa_name' => 'GLPI Service Desk',
         'pwa_short_name' => 'GLPI',
         'pwa_theme_color' => '#0d6efd',
@@ -192,7 +189,18 @@ function plugin_glpipwa_install() {
             'pwa_orientation' => 'any',
         ];
 
-        PluginGlpipwaConfig::setMultiple($defaults);
+        // Filtrar apenas as configurações que não existem
+        $newDefaults = [];
+        foreach ($defaults as $key => $value) {
+            if (!isset($existing[$key])) {
+                $newDefaults[$key] = $value;
+            }
+        }
+
+        // Definir apenas as novas configurações
+        if (!empty($newDefaults)) {
+            PluginGlpipwaConfig::setMultiple($newDefaults);
+        }
 
         // Registrar tarefa cron para limpeza de tokens
         if (class_exists('PluginGlpipwaCron')) {

@@ -30,7 +30,10 @@
  * ---------------------------------------------------------------------
  */
 
-include('../../../inc/includes.php');
+if (!defined('GLPI_ROOT')) {
+    define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
+}
+include(GLPI_ROOT . '/inc/includes.php');
 
 header('Content-Type: application/json');
 
@@ -58,40 +61,88 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit;
 }
 
-// Validar CSRF token ou Origin/Referer
+// Validar CSRF token - CRÍTICO: deve ser feito antes de qualquer outra operação
+// O GLPI 11 tem um listener do Symfony que verifica CSRF automaticamente
+// Aceitar token tanto do body JSON quanto do header HTTP
 $csrfToken = $data['_glpi_csrf_token'] ?? '';
-$validCsrf = false;
-$validOrigin = false;
-
-// Tentar validar CSRF token
-if (!empty($csrfToken)) {
-    $_POST['_glpi_csrf_token'] = $csrfToken;
-    $validCsrf = Session::validateCSRF(['_glpi_csrf_token' => $csrfToken]);
+if (empty($csrfToken)) {
+    // Tentar obter do header HTTP (padrão do GLPI 11)
+    $csrfToken = $_SERVER['HTTP_X_GLPI_CSRF_TOKEN'] ?? '';
+}
+if (empty($csrfToken)) {
+    // Tentar obter do header alternativo
+    $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 }
 
-// Validar Origin ou Referer como fallback para PWA
-if (!$validCsrf) {
-    $serverHost = $_SERVER['HTTP_HOST'] ?? '';
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    $referer = $_SERVER['HTTP_REFERER'] ?? '';
+if (!empty($csrfToken)) {
+    // Colocar no $_POST para que o listener do Symfony encontre
+    $_POST['_glpi_csrf_token'] = $csrfToken;
+    // Validar explicitamente
+    if (!Session::validateCSRF(['_glpi_csrf_token' => $csrfToken])) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Token de segurança inválido',
+            'title' => 'Acesso negado',
+            'message' => 'A ação que você requisitou não é permitida.'
+        ]);
+        exit;
+    }
+} else {
+    // CSRF token ausente - bloquear para segurança
+    // No entanto, se o usuário está autenticado e a requisição vem do mesmo domínio,
+    // podemos ser mais permissivos para endpoints que não são críticos
+    // Mas para manter segurança, vamos requerer o token
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Token de segurança ausente',
+        'title' => 'Acesso negado',
+        'message' => 'Token de segurança CSRF não fornecido.'
+    ]);
+    exit;
+}
+
+// Validar segurança: Origin/Referer (apenas como medida adicional de segurança)
+// Como já verificamos autenticação de sessão acima, confiamos na autenticação
+// Requisições fetch com credentials: 'same-origin' garantem que vem do mesmo domínio
+// A validação de Origin/Referer serve apenas para logging e detecção de anormalidades
+$serverHost = $_SERVER['HTTP_HOST'] ?? '';
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$referer = $_SERVER['HTTP_REFERER'] ?? '';
+$originValidated = false;
+
+// Verificar Origin ou Referer apenas para logging
+if (!empty($serverHost)) {
+    // Normalizar host (remover porta se presente)
+    $serverHostNormalized = preg_replace('/:\d+$/', '', $serverHost);
     
-    // Verificar se Origin ou Referer correspondem ao host do servidor
-    if (!empty($serverHost)) {
-        if (!empty($origin) && strpos($origin, $serverHost) !== false) {
-            $validOrigin = true;
-        } elseif (!empty($referer) && strpos($referer, $serverHost) !== false) {
-            $validOrigin = true;
+    // Verificar Origin
+    if (!empty($origin)) {
+        $originHost = parse_url($origin, PHP_URL_HOST);
+        if ($originHost && ($originHost === $serverHost || $originHost === $serverHostNormalized)) {
+            $originValidated = true;
+        }
+    }
+    
+    // Verificar Referer se Origin não validou
+    if (!$originValidated && !empty($referer)) {
+        $refererHost = parse_url($referer, PHP_URL_HOST);
+        if ($refererHost && ($refererHost === $serverHost || $refererHost === $serverHostNormalized)) {
+            $originValidated = true;
         }
     }
 }
 
-// Bloquear se nem CSRF nem Origin/Referer forem válidos
-if (!$validCsrf && !$validOrigin) {
-    Toolbox::logWarning('GLPIPWA: Tentativa de registro de token FCM sem CSRF ou Origin válido');
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Forbidden - Invalid security token']);
-    exit;
+// Log de aviso apenas se Origin/Referer não foi validado (mas não bloquear)
+// Isso ajuda a detectar possíveis problemas sem bloquear requisições válidas
+// de usuários autenticados
+if (!$originValidated && class_exists('Toolbox')) {
+    Toolbox::logWarning('GLPIPWA: Registro de token FCM sem validação de Origin/Referer. Host: ' . ($serverHost ?? 'N/A') . ', Origin: ' . ($origin ?? 'N/A') . ', Referer: ' . ($referer ?? 'N/A') . ', UserID: ' . Session::getLoginUserID());
 }
+
+// Não bloquear - o usuário está autenticado, o que é suficiente para segurança
+// A validação de sessão do GLPI já garante que a requisição é legítima
 
 // Validar token FCM
 if (!isset($data['token']) || empty($data['token'])) {

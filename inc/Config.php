@@ -79,13 +79,13 @@ class PluginGlpipwaConfig
      */
     public static function validateFirebaseConfig(array $config)
     {
+        // Campos obrigatórios básicos
         $required = [
             'firebase_api_key',
             'firebase_project_id',
             'firebase_messaging_sender_id',
             'firebase_app_id',
             'firebase_vapid_key',
-            'firebase_server_key',
         ];
 
         foreach ($required as $key) {
@@ -94,7 +94,18 @@ class PluginGlpipwaConfig
             }
         }
 
-        return true;
+        // Validar Service Account (apenas via JSON)
+        $jsonData = $config['firebase_service_account_json'] ?? '';
+        if (!empty($jsonData)) {
+            $decoded = json_decode($jsonData, true);
+            if ($decoded && isset($decoded['client_email']) && isset($decoded['private_key'])) {
+                if (filter_var($decoded['client_email'], FILTER_VALIDATE_EMAIL)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

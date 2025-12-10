@@ -42,6 +42,7 @@ function plugin_glpipwa_load_classes() {
             $files = [
                 __DIR__ . '/inc/Config.php',
                 __DIR__ . '/inc/Token.php',
+                __DIR__ . '/inc/FirebaseAuth.php',
                 __DIR__ . '/inc/NotificationPush.php',
                 __DIR__ . '/inc/Manifest.php',
                 __DIR__ . '/inc/Icon.php',
