@@ -72,13 +72,44 @@ class PluginGlpipwaNotificationPush
         $tokens = PluginGlpipwaToken::getUserTokens($users_id);
         
         if (empty($tokens)) {
+            Toolbox::logDebug("GLPI PWA: Nenhum token encontrado para o usuário ID: {$users_id}");
             return false;
         }
 
+        $totalTokens = count($tokens);
+        Toolbox::logDebug("GLPI PWA: Enviando notificação para usuário ID: {$users_id} - Total de tokens: {$totalTokens}");
+
         $results = [];
+        $successCount = 0;
+        $failureCount = 0;
+        $firstToken = true;
+
         foreach ($tokens as $token) {
-            $results[] = $this->send($token, $title, $body, $data);
+            // Adicionar delay de 100ms entre requisições para evitar rate limiting (exceto na primeira)
+            if (!$firstToken) {
+                usleep(100000); // 100ms em microsegundos
+            }
+            $firstToken = false;
+
+            try {
+                $result = $this->send($token, $title, $body, $data);
+                $results[] = $result;
+                
+                if ($result !== false) {
+                    $successCount++;
+                    Toolbox::logDebug("GLPI PWA: Notificação enviada com sucesso para token (usuário ID: {$users_id})");
+                } else {
+                    $failureCount++;
+                    Toolbox::logWarning("GLPI PWA: Falha ao enviar notificação para token (usuário ID: {$users_id})");
+                }
+            } catch (Exception $e) {
+                $failureCount++;
+                $results[] = false;
+                Toolbox::logError("GLPI PWA: Exceção ao enviar notificação para token (usuário ID: {$users_id}): " . $e->getMessage());
+            }
         }
+
+        Toolbox::logDebug("GLPI PWA: Resumo de envio para usuário ID: {$users_id} - Sucessos: {$successCount}, Falhas: {$failureCount}, Total: {$totalTokens}");
 
         return $results;
     }
@@ -91,15 +122,50 @@ class PluginGlpipwaNotificationPush
         $usersTokens = PluginGlpipwaToken::getUsersTokens($users_ids);
         
         if (empty($usersTokens)) {
+            Toolbox::logDebug("GLPI PWA: Nenhum token encontrado para os usuários: " . implode(', ', $users_ids));
             return false;
         }
 
+        $totalUsers = count($usersTokens);
+        $totalTokens = 0;
+        foreach ($usersTokens as $tokens) {
+            $totalTokens += count($tokens);
+        }
+        Toolbox::logDebug("GLPI PWA: Enviando notificação para {$totalUsers} usuário(s) - Total de tokens: {$totalTokens}");
+
         $results = [];
+        $successCount = 0;
+        $failureCount = 0;
+        $firstToken = true;
+
         foreach ($usersTokens as $users_id => $tokens) {
             foreach ($tokens as $token) {
-                $results[] = $this->send($token, $title, $body, $data);
+                // Adicionar delay de 100ms entre requisições para evitar rate limiting (exceto na primeira)
+                if (!$firstToken) {
+                    usleep(100000); // 100ms em microsegundos
+                }
+                $firstToken = false;
+
+                try {
+                    $result = $this->send($token, $title, $body, $data);
+                    $results[] = $result;
+                    
+                    if ($result !== false) {
+                        $successCount++;
+                        Toolbox::logDebug("GLPI PWA: Notificação enviada com sucesso para token (usuário ID: {$users_id})");
+                    } else {
+                        $failureCount++;
+                        Toolbox::logWarning("GLPI PWA: Falha ao enviar notificação para token (usuário ID: {$users_id})");
+                    }
+                } catch (Exception $e) {
+                    $failureCount++;
+                    $results[] = false;
+                    Toolbox::logError("GLPI PWA: Exceção ao enviar notificação para token (usuário ID: {$users_id}): " . $e->getMessage());
+                }
             }
         }
+
+        Toolbox::logDebug("GLPI PWA: Resumo de envio para múltiplos usuários - Sucessos: {$successCount}, Falhas: {$failureCount}, Total: {$totalTokens}");
 
         return $results;
     }
@@ -150,6 +216,8 @@ class PluginGlpipwaNotificationPush
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos para a requisição completa
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Timeout de 10 segundos para conexão
 
         $result = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
