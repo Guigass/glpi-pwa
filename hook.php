@@ -46,6 +46,59 @@ function plugin_glpipwa_load_hook_classes() {
 }
 
 /**
+ * Armazena o estado anterior dos tickets para comparação
+ * Chave: ticket ID, Valor: array com campos do ticket
+ */
+$GLOBALS['plugin_glpipwa_ticket_previous_state'] = [];
+
+/**
+ * Hook chamado antes de um item ser atualizado
+ * Captura o estado anterior do ticket para comparação posterior
+ */
+function plugin_glpipwa_pre_item_update($item) {
+    try {
+        // Verificar se a classe Ticket existe antes de usar instanceof
+        if (!class_exists('Ticket')) {
+            return;
+        }
+        
+        if ($item instanceof Ticket) {
+            $ticketId = $item->getID();
+            
+            if ($ticketId > 0) {
+                // Carregar o ticket do banco para obter o estado atual (antes da atualização)
+                $ticket = new Ticket();
+                if ($ticket->getFromDB($ticketId)) {
+                    // Armazenar campos relevantes para comparação
+                    $GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId] = [
+                        'status' => $ticket->getField('status'),
+                        'users_id_tech' => $ticket->getField('users_id_tech'),
+                        'groups_id_tech' => $ticket->getField('groups_id_tech'),
+                        'urgency' => $ticket->getField('urgency'),
+                        'priority' => $ticket->getField('priority'),
+                        'impact' => $ticket->getField('impact'),
+                    ];
+                    
+                    if (class_exists('Toolbox')) {
+                        Toolbox::logDebug("GLPI PWA: Estado anterior capturado para ticket ID: {$ticketId}");
+                    }
+                }
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciosamente ignora erros para não quebrar o fluxo do GLPI
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_pre_item_update - " . $e->getMessage());
+        }
+    } catch (Throwable $e) {
+        // Capturar também erros fatais
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_pre_item_update - " . $e->getMessage());
+        }
+    }
+}
+
+/**
  * Hook chamado quando um item é adicionado
  */
 function plugin_glpipwa_item_add($item) {
@@ -131,7 +184,16 @@ function plugin_glpipwa_item_update($item) {
             
             if (class_exists('PluginGlpipwaNotificationPush')) {
                 $notification = new PluginGlpipwaNotificationPush();
-                $notification->notifyTicketUpdate($item);
+                
+                // Obter estado anterior se disponível
+                $previousState = null;
+                if (isset($GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId])) {
+                    $previousState = $GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId];
+                    // Limpar estado anterior após uso
+                    unset($GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId]);
+                }
+                
+                $notification->notifyTicketUpdate($item, $previousState);
                 
                 if (class_exists('Toolbox')) {
                     Toolbox::logDebug("GLPI PWA: Notificação de atualização enviada para ticket ID: {$ticketId}");

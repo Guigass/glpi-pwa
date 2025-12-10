@@ -118,6 +118,10 @@ function plugin_init_glpipwa() {
         'ITILFollowup' => 'plugin_glpipwa_followup_add',
     ];
     
+    $PLUGIN_HOOKS['pre_item_update']['glpipwa'] = [
+        'Ticket' => 'plugin_glpipwa_pre_item_update',
+    ];
+    
     $PLUGIN_HOOKS['item_update']['glpipwa'] = [
         'Ticket' => 'plugin_glpipwa_item_update',
     ];

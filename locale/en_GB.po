@@ -156,6 +156,30 @@ msgstr "%s commented: %s"
 msgid "User"
 msgstr "User"
 
+msgid "Ticket #%d Closed"
+msgstr "Ticket #%d Closed"
+
+msgid "Ticket closed by %s"
+msgstr "Ticket closed by %s"
+
+msgid "Ticket #%d Solved"
+msgstr "Ticket #%d Solved"
+
+msgid "Ticket solved by %s - Awaiting validation"
+msgstr "Ticket solved by %s - Awaiting validation"
+
+msgid "Ticket #%d Assigned"
+msgstr "Ticket #%d Assigned"
+
+msgid "Ticket assigned to: %s"
+msgstr "Ticket assigned to: %s"
+
+msgid "System"
+msgstr "System"
+
+msgid "Unassigned"
+msgstr "Unassigned"
+
 msgid "GLPI PWA Token Cleanup"
 msgstr "GLPI PWA Token Cleanup"
 

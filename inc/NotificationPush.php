@@ -322,7 +322,7 @@ class PluginGlpipwaNotificationPush
         );
 
         $data = [
-            'url' => $ticket->getLinkURL(),
+            'url' => $this->getTicketUrl($ticket),
             'ticket_id' => $ticket->getID(),
             'type' => 'new_ticket',
         ];
@@ -331,9 +331,85 @@ class PluginGlpipwaNotificationPush
     }
 
     /**
-     * Notifica sobre atualização de ticket
+     * Detecta o tipo de mudança ocorrida no ticket
+     * 
+     * @param Ticket $ticket Ticket atualizado
+     * @param array|null $previousState Estado anterior do ticket
+     * @return string Tipo de mudança detectada: 'closed', 'solved', 'assigned', 'updated', ou null
      */
-    public function notifyTicketUpdate(Ticket $ticket)
+    private function detectTicketChange(Ticket $ticket, $previousState = null)
+    {
+        if ($previousState === null) {
+            return 'updated';
+        }
+
+        $currentStatus = (int)$ticket->getField('status');
+        $previousStatus = isset($previousState['status']) ? (int)$previousState['status'] : null;
+
+        // Verificar se a classe CommonITILObject existe
+        if (!class_exists('CommonITILObject')) {
+            // Se não existir, usar valores numéricos diretos
+            $CLOSED = 6;
+            $SOLVED = 5;
+        } else {
+            $CLOSED = CommonITILObject::CLOSED;
+            $SOLVED = CommonITILObject::SOLVED;
+        }
+
+        // Detectar fechamento
+        if ($previousStatus !== $CLOSED && $currentStatus === $CLOSED) {
+            return 'closed';
+        }
+
+        // Detectar solução
+        if ($previousStatus !== $SOLVED && $currentStatus === $SOLVED) {
+            return 'solved';
+        }
+
+        // Detectar atribuição (mudança de técnico ou grupo técnico)
+        $currentTech = (int)$ticket->getField('users_id_tech');
+        $previousTech = isset($previousState['users_id_tech']) ? (int)$previousState['users_id_tech'] : 0;
+        
+        $currentGroup = (int)$ticket->getField('groups_id_tech');
+        $previousGroup = isset($previousState['groups_id_tech']) ? (int)$previousState['groups_id_tech'] : 0;
+
+        if ($currentTech !== $previousTech || $currentGroup !== $previousGroup) {
+            return 'assigned';
+        }
+
+        // Outras atualizações
+        return 'updated';
+    }
+
+    /**
+     * Obtém URL completa do ticket
+     * 
+     * @param Ticket $ticket
+     * @return string URL completa do ticket
+     */
+    private function getTicketUrl(Ticket $ticket)
+    {
+        $url = $ticket->getLinkURL();
+        
+        // Se a URL não for absoluta, construir URL completa
+        if (!empty($url) && !preg_match('/^https?:\/\//', $url)) {
+            global $CFG_GLPI;
+            if (isset($CFG_GLPI['url_base']) && !empty($CFG_GLPI['url_base'])) {
+                $baseUrl = rtrim($CFG_GLPI['url_base'], '/');
+                $url = $baseUrl . '/' . ltrim($url, '/');
+            }
+        }
+        
+        return $url;
+    }
+
+    /**
+     * Notifica sobre atualização de ticket
+     * 
+     * @param Ticket $ticket Ticket atualizado
+     * @param array|null $previousState Estado anterior do ticket
+     */
+    public function notifyTicketUpdate(Ticket $ticket, $previousState = null)
     {
         $ticketId = $ticket->getID();
         Toolbox::logDebug("GLPI PWA: notifyTicketUpdate chamado para ticket ID: {$ticketId}");
@@ -344,26 +420,214 @@ class PluginGlpipwaNotificationPush
             return;
         }
 
-        $recipients = $this->getTicketRecipients($ticket, false);
-        Toolbox::logDebug("GLPI PWA: Destinatários encontrados para atualização de ticket ID: {$ticketId} - Total: " . count($recipients));
-        
-        if (empty($recipients)) {
-            Toolbox::logDebug("GLPI PWA: Nenhum destinatário encontrado para atualização de ticket ID: {$ticketId}");
+        // Detectar tipo de mudança
+        $changeType = $this->detectTicketChange($ticket, $previousState);
+        Toolbox::logDebug("GLPI PWA: Tipo de mudança detectado para ticket ID: {$ticketId} - Tipo: {$changeType}");
+
+        // Chamar método específico baseado no tipo de mudança
+        switch ($changeType) {
+            case 'closed':
+                $this->notifyTicketClosed($ticket, $previousState);
+                break;
+            
+            case 'solved':
+                $this->notifyTicketSolved($ticket, $previousState);
+                break;
+            
+            case 'assigned':
+                $this->notifyTicketAssigned($ticket, $previousState);
+                break;
+            
+            case 'updated':
+            default:
+                // Notificação genérica de atualização
+                $recipients = $this->getTicketRecipients($ticket, false);
+                
+                if (empty($recipients)) {
+                    Toolbox::logDebug("GLPI PWA: Nenhum destinatário encontrado para atualização de ticket ID: {$ticketId}");
+                    return;
+                }
+
+                $title = sprintf(__('Ticket #%d Updated', 'glpipwa'), $ticketId);
+                $body = __('The ticket has been updated', 'glpipwa');
+
+                $data = [
+                    'url' => $this->getTicketUrl($ticket),
+                    'ticket_id' => $ticketId,
+                    'type' => 'ticket_update',
+                ];
+
+                $this->sendToUsers($recipients, $title, $body, $data);
+                break;
+        }
+
+        Toolbox::logDebug("GLPI PWA: Notificação processada para ticket ID: {$ticketId}");
+    }
+
+    /**
+     * Notifica quando um ticket é fechado
+     * 
+     * @param Ticket $ticket Ticket fechado
+     * @param array|null $previousState Estado anterior do ticket
+     */
+    public function notifyTicketClosed(Ticket $ticket, $previousState = null)
+    {
+        // Verificar se Firebase está configurado
+        if (!$this->isFirebaseConfigured()) {
             return;
         }
 
-        $title = sprintf(__('Ticket #%d Updated', 'glpipwa'), $ticketId);
-        $body = __('The ticket has been updated', 'glpipwa');
+        $ticketId = $ticket->getID();
+        $recipients = $this->getTicketRecipients($ticket, false);
+        
+        if (empty($recipients)) {
+            return;
+        }
+
+        // Obter nome de quem fechou (usuário atual da sessão)
+        $closedByName = __('System', 'glpipwa');
+        if (class_exists('Session') && Session::getLoginUserID()) {
+            $userId = Session::getLoginUserID();
+            if (class_exists('User')) {
+                try {
+                    $user = new User();
+                    if ($user->getFromDB($userId)) {
+                        $closedByName = $user->getName();
+                    }
+                } catch (Exception $e) {
+                    // Usa nome padrão se não conseguir obter
+                }
+            }
+        }
+
+        $title = sprintf(__('Ticket #%d Closed', 'glpipwa'), $ticketId);
+        $body = sprintf(__('Ticket closed by %s', 'glpipwa'), $closedByName);
 
         $data = [
-            'url' => $ticket->getLinkURL(),
+            'url' => $this->getTicketUrl($ticket),
             'ticket_id' => $ticketId,
-            'type' => 'ticket_update',
+            'type' => 'ticket_closed',
+            'status' => (string)$ticket->getField('status'),
         ];
 
-        Toolbox::logDebug("GLPI PWA: Enviando notificação de atualização para ticket ID: {$ticketId} - Título: {$title}");
         $this->sendToUsers($recipients, $title, $body, $data);
-        Toolbox::logDebug("GLPI PWA: Notificação de atualização processada para ticket ID: {$ticketId}");
+    }
+
+    /**
+     * Notifica quando um ticket é solucionado
+     * 
+     * @param Ticket $ticket Ticket solucionado
+     * @param array|null $previousState Estado anterior do ticket
+     */
+    public function notifyTicketSolved(Ticket $ticket, $previousState = null)
+    {
+        // Verificar se Firebase está configurado
+        if (!$this->isFirebaseConfigured()) {
+            return;
+        }
+
+        $ticketId = $ticket->getID();
+        $recipients = $this->getTicketRecipients($ticket, false);
+        
+        if (empty($recipients)) {
+            return;
+        }
+
+        // Obter nome de quem solucionou
+        $solvedByName = __('System', 'glpipwa');
+        if (class_exists('Session') && Session::getLoginUserID()) {
+            $userId = Session::getLoginUserID();
+            if (class_exists('User')) {
+                try {
+                    $user = new User();
+                    if ($user->getFromDB($userId)) {
+                        $solvedByName = $user->getName();
+                    }
+                } catch (Exception $e) {
+                    // Usa nome padrão se não conseguir obter
+                }
+            }
+        }
+
+        $title = sprintf(__('Ticket #%d Solved', 'glpipwa'), $ticketId);
+        $body = sprintf(__('Ticket solved by %s - Awaiting validation', 'glpipwa'), $solvedByName);
+
+        $data = [
+            'url' => $this->getTicketUrl($ticket),
+            'ticket_id' => $ticketId,
+            'type' => 'ticket_solved',
+            'status' => (string)$ticket->getField('status'),
+        ];
+
+        $this->sendToUsers($recipients, $title, $body, $data);
+    }
+
+    /**
+     * Notifica quando um ticket é atribuído
+     * 
+     * @param Ticket $ticket Ticket atribuído
+     * @param array|null $previousState Estado anterior do ticket
+     */
+    public function notifyTicketAssigned(Ticket $ticket, $previousState = null)
+    {
+        // Verificar se Firebase está configurado
+        if (!$this->isFirebaseConfigured()) {
+            return;
+        }
+
+        $ticketId = $ticket->getID();
+        $recipients = $this->getTicketRecipients($ticket, false);
+        
+        if (empty($recipients)) {
+            return;
+        }
+
+        // Obter informações sobre a atribuição
+        $assignedTo = '';
+        $currentTech = (int)$ticket->getField('users_id_tech');
+        $currentGroup = (int)$ticket->getField('groups_id_tech');
+
+        if ($currentTech > 0 && class_exists('User')) {
+            try {
+                $user = new User();
+                if ($user->getFromDB($currentTech)) {
+                    $assignedTo = $user->getName();
+                }
+            } catch (Exception $e) {
+                // Ignora erro
+            }
+        }
+
+        if ($currentGroup > 0 && class_exists('Group')) {
+            try {
+                $group = new Group();
+                if ($group->getFromDB($currentGroup)) {
+                    $groupName = $group->getName();
+                    if (!empty($assignedTo)) {
+                        $assignedTo .= ' / ' . $groupName;
+                    } else {
+                        $assignedTo = $groupName;
+                    }
+                }
+            } catch (Exception $e) {
+                // Ignora erro
+            }
+        }
+
+        if (empty($assignedTo)) {
+            $assignedTo = __('Unassigned', 'glpipwa');
+        }
+
+        $title = sprintf(__('Ticket #%d Assigned', 'glpipwa'), $ticketId);
+        $body = sprintf(__('Ticket assigned to: %s', 'glpipwa'), $assignedTo);
+
+        $data = [
+            'url' => $this->getTicketUrl($ticket),
+            'ticket_id' => $ticketId,
+            'type' => 'ticket_assigned',
+        ];
+
+        $this->sendToUsers($recipients, $title, $body, $data);
     }
 
     /**
@@ -418,7 +682,7 @@ class PluginGlpipwaNotificationPush
         $body = sprintf(__('%s commented: %s', 'glpipwa'), $authorName, substr($followup->getField('content'), 0, 100));
 
         $data = [
-            'url' => $item->getLinkURL(),
+            'url' => $this->getTicketUrl($item),
             'ticket_id' => $item->getID(),
             'type' => 'new_followup',
         ];

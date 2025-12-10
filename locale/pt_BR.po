@@ -156,6 +156,30 @@ msgstr "%s comentou: %s"
 msgid "User"
 msgstr "Usuário"
 
+msgid "Ticket #%d Closed"
+msgstr "Chamado #%d Fechado"
+
+msgid "Ticket closed by %s"
+msgstr "Chamado fechado por %s"
+
+msgid "Ticket #%d Solved"
+msgstr "Chamado #%d Solucionado"
+
+msgid "Ticket solved by %s - Awaiting validation"
+msgstr "Chamado solucionado por %s - Aguardando validação"
+
+msgid "Ticket #%d Assigned"
+msgstr "Chamado #%d Atribuído"
+
+msgid "Ticket assigned to: %s"
+msgstr "Chamado atribuído para: %s"
+
+msgid "System"
+msgstr "Sistema"
+
+msgid "Unassigned"
+msgstr "Não atribuído"
+
 msgid "GLPI PWA Token Cleanup"
 msgstr "Limpeza de Tokens GLPI PWA"
 
