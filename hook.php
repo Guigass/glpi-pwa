@@ -49,7 +49,17 @@ function plugin_glpipwa_load_hook_classes() {
  * Armazena o estado anterior dos tickets para comparação
  * Chave: ticket ID, Valor: array com campos do ticket
  */
-$GLOBALS['plugin_glpipwa_ticket_previous_state'] = [];
+if (!isset($GLOBALS['plugin_glpipwa_ticket_previous_state'])) {
+    $GLOBALS['plugin_glpipwa_ticket_previous_state'] = [];
+}
+
+/**
+ * Armazena tickets recém-criados para evitar notificação de "updated" logo após criação
+ * Chave: ticket ID, Valor: timestamp de criação
+ */
+if (!isset($GLOBALS['plugin_glpipwa_new_tickets'])) {
+    $GLOBALS['plugin_glpipwa_new_tickets'] = [];
+}
 
 /**
  * Hook chamado antes de um item ser atualizado
@@ -70,17 +80,25 @@ function plugin_glpipwa_pre_item_update($item) {
                 $ticket = new Ticket();
                 if ($ticket->getFromDB($ticketId)) {
                     // Armazenar campos relevantes para comparação
+                    $previousStatus = $ticket->getField('status');
+                    $previousTech = $ticket->getField('users_id_tech');
+                    $previousGroup = $ticket->getField('groups_id_tech');
+                    
                     $GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId] = [
-                        'status' => $ticket->getField('status'),
-                        'users_id_tech' => $ticket->getField('users_id_tech'),
-                        'groups_id_tech' => $ticket->getField('groups_id_tech'),
+                        'status' => $previousStatus,
+                        'users_id_tech' => $previousTech,
+                        'groups_id_tech' => $previousGroup,
                         'urgency' => $ticket->getField('urgency'),
                         'priority' => $ticket->getField('priority'),
                         'impact' => $ticket->getField('impact'),
                     ];
                     
                     if (class_exists('Toolbox')) {
-                        Toolbox::logDebug("GLPI PWA: Estado anterior capturado para ticket ID: {$ticketId}");
+                        Toolbox::logDebug("GLPI PWA: Estado anterior capturado para ticket ID: {$ticketId} - Status: {$previousStatus}, Técnico: {$previousTech}, Grupo: {$previousGroup}");
+                    }
+                } else {
+                    if (class_exists('Toolbox')) {
+                        Toolbox::logWarning("GLPI PWA: Não foi possível carregar ticket ID: {$ticketId} para capturar estado anterior");
                     }
                 }
             }
@@ -121,6 +139,9 @@ function plugin_glpipwa_item_add($item) {
             if (class_exists('Toolbox')) {
                 Toolbox::logDebug("GLPI PWA: Processando novo ticket ID: {$ticketId}");
             }
+            
+            // Marcar ticket como recém-criado para evitar notificação de "updated" logo após
+            $GLOBALS['plugin_glpipwa_new_tickets'][$ticketId] = time();
             
             plugin_glpipwa_load_hook_classes();
             
@@ -176,6 +197,26 @@ function plugin_glpipwa_item_update($item) {
         
         if ($item instanceof Ticket) {
             $ticketId = $item->getID();
+            
+            // Ignorar atualizações que ocorrem logo após a criação do ticket (dentro de 2 segundos)
+            // Isso evita notificação duplicada de "updated" quando um ticket é criado
+            if (isset($GLOBALS['plugin_glpipwa_new_tickets'][$ticketId])) {
+                $creationTime = $GLOBALS['plugin_glpipwa_new_tickets'][$ticketId];
+                $timeSinceCreation = time() - $creationTime;
+                
+                if ($timeSinceCreation < 2) {
+                    // Remover da lista de novos tickets após 2 segundos
+                    if (class_exists('Toolbox')) {
+                        Toolbox::logDebug("GLPI PWA: Ignorando atualização de ticket recém-criado ID: {$ticketId} (criado há {$timeSinceCreation}s)");
+                    }
+                    unset($GLOBALS['plugin_glpipwa_new_tickets'][$ticketId]);
+                    return;
+                }
+                
+                // Remover da lista de novos tickets
+                unset($GLOBALS['plugin_glpipwa_new_tickets'][$ticketId]);
+            }
+            
             if (class_exists('Toolbox')) {
                 Toolbox::logDebug("GLPI PWA: Processando atualização de ticket ID: {$ticketId}");
             }

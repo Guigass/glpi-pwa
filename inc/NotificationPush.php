@@ -340,11 +340,14 @@ class PluginGlpipwaNotificationPush
     private function detectTicketChange(Ticket $ticket, $previousState = null)
     {
         if ($previousState === null) {
+            Toolbox::logDebug("GLPI PWA: detectTicketChange - Estado anterior não disponível, retornando 'updated'");
             return 'updated';
         }
 
         $currentStatus = (int)$ticket->getField('status');
         $previousStatus = isset($previousState['status']) ? (int)$previousState['status'] : null;
+        
+        Toolbox::logDebug("GLPI PWA: detectTicketChange - Status anterior: {$previousStatus}, Status atual: {$currentStatus}");
 
         // Verificar se a classe CommonITILObject existe
         if (!class_exists('CommonITILObject')) {
@@ -358,11 +361,13 @@ class PluginGlpipwaNotificationPush
 
         // Detectar fechamento
         if ($previousStatus !== $CLOSED && $currentStatus === $CLOSED) {
+            Toolbox::logDebug("GLPI PWA: detectTicketChange - Mudança detectada: FECHAMENTO");
             return 'closed';
         }
 
         // Detectar solução
         if ($previousStatus !== $SOLVED && $currentStatus === $SOLVED) {
+            Toolbox::logDebug("GLPI PWA: detectTicketChange - Mudança detectada: SOLUÇÃO");
             return 'solved';
         }
 
@@ -374,10 +379,12 @@ class PluginGlpipwaNotificationPush
         $previousGroup = isset($previousState['groups_id_tech']) ? (int)$previousState['groups_id_tech'] : 0;
 
         if ($currentTech !== $previousTech || $currentGroup !== $previousGroup) {
+            Toolbox::logDebug("GLPI PWA: detectTicketChange - Mudança detectada: ATRIBUIÇÃO (Técnico: {$previousTech} -> {$currentTech}, Grupo: {$previousGroup} -> {$currentGroup})");
             return 'assigned';
         }
 
         // Outras atualizações
+        Toolbox::logDebug("GLPI PWA: detectTicketChange - Mudança detectada: ATUALIZAÇÃO GENÉRICA");
         return 'updated';
     }
 
