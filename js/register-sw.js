@@ -3,29 +3,26 @@
  * Usa Firebase SDK v9 compat para compatibilidade com API legacy
  */
 
-(function() {
+(function () {
     'use strict';
 
     // Verificar suporte a Service Worker
     if ('serviceWorker' in navigator) {
         const pluginUrl = getPluginUrl();
-        
+
         // Registrar Service Worker com escopo ampliado via PHP proxy
         navigator.serviceWorker.register(pluginUrl + '/front/sw-proxy.php', {
             scope: '/'
         })
             .then((registration) => {
-                console.log('Service Worker registrado com sucesso:', registration.scope);
-                
                 // Inicializar Firebase após registro do SW
                 initializeFirebase(registration);
             })
             .catch((error) => {
                 console.error('Erro ao registrar Service Worker:', error);
-                // Fallback: tentar registrar sem escopo ampliado
-                navigator.serviceWorker.register(pluginUrl + '/js/sw.js')
+                // Fallback: tentar registrar sem escopo ampliado usando endpoint PHP
+                navigator.serviceWorker.register(pluginUrl + '/front/sw.php')
                     .then((registration) => {
-                        console.log('Service Worker registrado (fallback):', registration.scope);
                         initializeFirebase(registration);
                     })
                     .catch((err) => {
@@ -42,8 +39,14 @@
     function getPluginUrl() {
         const scripts = document.getElementsByTagName('script');
         for (let script of scripts) {
-            if (script.src && script.src.includes('register-sw.js')) {
-                return script.src.substring(0, script.src.lastIndexOf('/js/register-sw.js'));
+            if (script.src && script.src.includes('register-sw')) {
+                // Suporta tanto /js/register-sw.js quanto /front/register-sw.php
+                if (script.src.includes('/front/register-sw.php')) {
+                    return script.src.substring(0, script.src.lastIndexOf('/front/register-sw.php'));
+                }
+                if (script.src.includes('/js/register-sw.js')) {
+                    return script.src.substring(0, script.src.lastIndexOf('/js/register-sw.js'));
+                }
             }
         }
         return '/plugins/glpipwa';
@@ -71,7 +74,7 @@
                 if (!firebase.apps.length) {
                     firebase.initializeApp(firebaseConfig);
                 }
-                
+
                 const messaging = firebase.messaging();
 
                 // Usar o service worker registrado
@@ -110,14 +113,14 @@
             appScript.onload = () => {
                 document.head.appendChild(messagingScript);
             };
-            
+
             messagingScript.onload = () => {
                 resolve();
             };
-            
+
             appScript.onerror = reject;
             messagingScript.onerror = reject;
-            
+
             document.head.appendChild(appScript);
         });
     }
@@ -133,16 +136,16 @@
                 'Accept': 'application/json'
             }
         })
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error('Erro ao buscar configuração Firebase');
-            }
-            return response.json();
-        })
-        .catch((error) => {
-            console.error('Erro ao parsear configuração Firebase:', error);
-            return null;
-        });
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar configuração Firebase');
+                }
+                return response.json();
+            })
+            .catch((error) => {
+                console.error('Erro ao parsear configuração Firebase:', error);
+                return null;
+            });
     }
 
     /**
@@ -188,12 +191,11 @@
 
         // Listener para mensagens em foreground
         messaging.onMessage((payload) => {
-            console.log('Mensagem recebida:', payload);
             // Exibir notificação mesmo com app aberto
             if (payload.notification && Notification.permission === 'granted') {
                 new Notification(payload.notification.title, {
                     body: payload.notification.body,
-                    icon: payload.notification.icon || '/pics/logo-glpi.png',
+                    icon: payload.notification.icon || '/pics/logos/logo-GLPI-250-white.png',
                 });
             }
         });
@@ -204,7 +206,7 @@
      */
     function registerToken(token) {
         const pluginUrl = getPluginUrl();
-        
+
         // Obter CSRF token do meta tag ou do formulário
         let csrfToken = '';
         const csrfMeta = document.querySelector('meta[name="csrf-token"]');
@@ -233,15 +235,13 @@
             },
             body: JSON.stringify(data)
         })
-        .then((response) => {
-            if (response.ok) {
-                console.log('Token registrado com sucesso');
-            } else {
-                console.error('Erro ao registrar token:', response.statusText);
-            }
-        })
-        .catch((error) => {
-            console.error('Erro ao registrar token:', error);
-        });
+            .then((response) => {
+                if (!response.ok) {
+                    console.error('Erro ao registrar token:', response.statusText);
+                }
+            })
+            .catch((error) => {
+                console.error('Erro ao registrar token:', error);
+            });
     }
 })();

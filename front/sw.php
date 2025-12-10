@@ -30,31 +30,36 @@
  * ---------------------------------------------------------------------
  */
 
+/**
+ * Proxy PHP para servir o Service Worker (fallback)
+ * Este arquivo serve o sw.js quando o sw-proxy.php não funcionar
+ * Permite que o SW seja acessível mesmo com o diretório public/ do GLPI 11
+ */
+
 if (!defined('GLPI_ROOT')) {
     define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
 }
 include(GLPI_ROOT . '/inc/includes.php');
 
-header('Content-Type: application/json');
+// Carregar classes do plugin
+plugin_glpipwa_load_classes();
 
-// Verificar autenticação
-if (!Session::getLoginUserID()) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Não autenticado']);
+// Verificar se o arquivo existe
+$jsFile = __DIR__ . '/../js/sw.js';
+if (!file_exists($jsFile) || !is_readable($jsFile)) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo '// File not found';
     exit;
 }
 
-$config = PluginGlpipwaConfig::getAll();
+// Headers para Service Worker (incluindo Service-Worker-Allowed para permitir escopo /)
+header('Content-Type: application/javascript; charset=utf-8');
+header('Service-Worker-Allowed: /');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('X-Content-Type-Options: nosniff');
 
-$firebaseConfig = [
-    'apiKey' => $config['firebase_api_key'] ?? '',
-    'authDomain' => ($config['firebase_project_id'] ?? '') . '.firebaseapp.com',
-    'projectId' => $config['firebase_project_id'] ?? '',
-    'storageBucket' => ($config['firebase_project_id'] ?? '') . '.appspot.com',
-    'messagingSenderId' => $config['firebase_messaging_sender_id'] ?? '',
-    'appId' => $config['firebase_app_id'] ?? '',
-    'vapidKey' => $config['firebase_vapid_key'] ?? '',
-];
-
-echo json_encode($firebaseConfig);
+// Servir o arquivo
+readfile($jsFile);
+exit;
 

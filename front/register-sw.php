@@ -30,31 +30,20 @@
  * ---------------------------------------------------------------------
  */
 
+/**
+ * Proxy PHP para servir o script de registro do Service Worker
+ * Este arquivo permite que o JS seja acessível mesmo com o diretório public/ do GLPI 11
+ */
+
 if (!defined('GLPI_ROOT')) {
     define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
 }
 include(GLPI_ROOT . '/inc/includes.php');
 
-header('Content-Type: application/json');
+// Carregar classes do plugin
+plugin_glpipwa_load_classes();
 
-// Verificar autenticação
-if (!Session::getLoginUserID()) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Não autenticado']);
-    exit;
-}
-
-$config = PluginGlpipwaConfig::getAll();
-
-$firebaseConfig = [
-    'apiKey' => $config['firebase_api_key'] ?? '',
-    'authDomain' => ($config['firebase_project_id'] ?? '') . '.firebaseapp.com',
-    'projectId' => $config['firebase_project_id'] ?? '',
-    'storageBucket' => ($config['firebase_project_id'] ?? '') . '.appspot.com',
-    'messagingSenderId' => $config['firebase_messaging_sender_id'] ?? '',
-    'appId' => $config['firebase_app_id'] ?? '',
-    'vapidKey' => $config['firebase_vapid_key'] ?? '',
-];
-
-echo json_encode($firebaseConfig);
+// Servir o arquivo JavaScript usando a classe auxiliar padronizada
+$jsFile = __DIR__ . '/../js/register-sw.js';
+PluginGlpipwaStaticFileServer::serve($jsFile, 'application/javascript');
 

@@ -68,9 +68,10 @@ class PluginGlpipwaToken extends CommonDBTM
         $existing = new self();
         if ($existing->getFromDBByCrit(['token' => $token])) {
             // Atualizar data de modificação e usuário se necessário
+            $current_time = isset($_SESSION['glpi_currenttime']) ? $_SESSION['glpi_currenttime'] : date('Y-m-d H:i:s');
             $input = [
                 'id' => $existing->getID(),
-                'date_mod' => $_SESSION['glpi_currenttime'],
+                'date_mod' => $current_time,
             ];
             if ($user_agent !== null) {
                 $input['user_agent'] = $user_agent;
@@ -84,12 +85,13 @@ class PluginGlpipwaToken extends CommonDBTM
 
         // Criar novo token
         $tokenObj = new self();
+        $current_time = isset($_SESSION['glpi_currenttime']) ? $_SESSION['glpi_currenttime'] : date('Y-m-d H:i:s');
         $input = [
             'users_id' => $users_id,
             'token' => $token,
             'user_agent' => $user_agent,
-            'date_creation' => $_SESSION['glpi_currenttime'],
-            'date_mod' => $_SESSION['glpi_currenttime'],
+            'date_creation' => $current_time,
+            'date_mod' => $current_time,
         ];
 
         return $tokenObj->add($input);

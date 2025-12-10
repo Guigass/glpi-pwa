@@ -32,7 +32,10 @@
 
 include('../../../inc/includes.php');
 
-Html::header(__('Configuração PWA', 'glpipwa'), $_SERVER['PHP_SELF'], 'config', 'plugins');
+// URL correta do plugin para GLPI 11
+$plugin_url = Plugin::getWebDir('glpipwa', true) . '/front/config.form.php';
+
+Html::header(__('PWA Configuration', 'glpipwa'), $plugin_url, 'config', 'plugins');
 
 if (!Session::haveRight('config', UPDATE)) {
     Html::displayRightError();
@@ -40,12 +43,7 @@ if (!Session::haveRight('config', UPDATE)) {
 }
 
 // Processar formulário
-if (isset($_POST['update']) && isset($_POST['_glpi_csrf_token'])) {
-    // Validar CSRF token
-    if (!Session::validateIDOR($_POST)) {
-        Session::addMessageAfterRedirect(__('Token de segurança inválido', 'glpipwa'), true, ERROR);
-        Html::redirect($_SERVER['PHP_SELF']);
-    }
+if (isset($_POST['update'])) {
     
     $config = [];
     
@@ -69,32 +67,60 @@ if (isset($_POST['update']) && isset($_POST['_glpi_csrf_token'])) {
     $config['pwa_display'] = in_array($_POST['pwa_display'] ?? 'standalone', ['standalone', 'fullscreen', 'minimal-ui', 'browser']) ? $_POST['pwa_display'] : 'standalone';
     $config['pwa_orientation'] = in_array($_POST['pwa_orientation'] ?? 'any', ['any', 'portrait', 'landscape']) ? $_POST['pwa_orientation'] : 'any';
     
-    // Validar
-    if (PluginGlpipwaConfig::validatePWAConfig($config)) {
-        // Preservar server key se não foi alterado
-        if (!isset($config['firebase_server_key'])) {
-            $current = PluginGlpipwaConfig::get('firebase_server_key');
-            if ($current) {
-                $config['firebase_server_key'] = $current;
-            }
-        }
-        
-        PluginGlpipwaConfig::setMultiple($config);
-        Session::addMessageAfterRedirect(__('Configurações salvas com sucesso', 'glpipwa'), true, INFO);
-    } else {
-        Session::addMessageAfterRedirect(__('Erro ao validar configurações', 'glpipwa'), true, ERROR);
-    }
+    // Salvar configurações
+    PluginGlpipwaConfig::setMultiple($config);
+    Session::addMessageAfterRedirect(__('Settings saved successfully', 'glpipwa'), true, INFO);
     
     // Upload de ícones
-    if (isset($_FILES['icon_192']) && $_FILES['icon_192']['error'] === UPLOAD_ERR_OK) {
-        PluginGlpipwaIcon::upload($_FILES['icon_192'], 192);
+    if (isset($_FILES['icon_192']) && !empty($_FILES['icon_192']['name'])) {
+        if ($_FILES['icon_192']['error'] === UPLOAD_ERR_OK) {
+            $result = PluginGlpipwaIcon::upload($_FILES['icon_192'], 192);
+            if ($result['success']) {
+                Session::addMessageAfterRedirect($result['message'], true, INFO);
+            } else {
+                Session::addMessageAfterRedirect($result['message'], true, ERROR);
+            }
+        } else {
+            // Tratar erros de upload do PHP
+            $error_messages = [
+                UPLOAD_ERR_INI_SIZE => __('Icon 192x192: File exceeds upload_max_filesize directive', 'glpipwa'),
+                UPLOAD_ERR_FORM_SIZE => __('Icon 192x192: File exceeds MAX_FILE_SIZE directive', 'glpipwa'),
+                UPLOAD_ERR_PARTIAL => __('Icon 192x192: File was only partially uploaded', 'glpipwa'),
+                UPLOAD_ERR_NO_FILE => __('Icon 192x192: No file was uploaded', 'glpipwa'),
+                UPLOAD_ERR_NO_TMP_DIR => __('Icon 192x192: Missing temporary folder', 'glpipwa'),
+                UPLOAD_ERR_CANT_WRITE => __('Icon 192x192: Failed to write file to disk', 'glpipwa'),
+                UPLOAD_ERR_EXTENSION => __('Icon 192x192: A PHP extension stopped the file upload', 'glpipwa'),
+            ];
+            $message = $error_messages[$_FILES['icon_192']['error']] ?? __('Icon 192x192: Unknown upload error', 'glpipwa');
+            Session::addMessageAfterRedirect($message, true, ERROR);
+        }
     }
     
-    if (isset($_FILES['icon_512']) && $_FILES['icon_512']['error'] === UPLOAD_ERR_OK) {
-        PluginGlpipwaIcon::upload($_FILES['icon_512'], 512);
+    if (isset($_FILES['icon_512']) && !empty($_FILES['icon_512']['name'])) {
+        if ($_FILES['icon_512']['error'] === UPLOAD_ERR_OK) {
+            $result = PluginGlpipwaIcon::upload($_FILES['icon_512'], 512);
+            if ($result['success']) {
+                Session::addMessageAfterRedirect($result['message'], true, INFO);
+            } else {
+                Session::addMessageAfterRedirect($result['message'], true, ERROR);
+            }
+        } else {
+            // Tratar erros de upload do PHP
+            $error_messages = [
+                UPLOAD_ERR_INI_SIZE => __('Icon 512x512: File exceeds upload_max_filesize directive', 'glpipwa'),
+                UPLOAD_ERR_FORM_SIZE => __('Icon 512x512: File exceeds MAX_FILE_SIZE directive', 'glpipwa'),
+                UPLOAD_ERR_PARTIAL => __('Icon 512x512: File was only partially uploaded', 'glpipwa'),
+                UPLOAD_ERR_NO_FILE => __('Icon 512x512: No file was uploaded', 'glpipwa'),
+                UPLOAD_ERR_NO_TMP_DIR => __('Icon 512x512: Missing temporary folder', 'glpipwa'),
+                UPLOAD_ERR_CANT_WRITE => __('Icon 512x512: Failed to write file to disk', 'glpipwa'),
+                UPLOAD_ERR_EXTENSION => __('Icon 512x512: A PHP extension stopped the file upload', 'glpipwa'),
+            ];
+            $message = $error_messages[$_FILES['icon_512']['error']] ?? __('Icon 512x512: Unknown upload error', 'glpipwa');
+            Session::addMessageAfterRedirect($message, true, ERROR);
+        }
     }
     
-    Html::redirect($_SERVER['PHP_SELF']);
+    Html::redirect($plugin_url);
 }
 
 // Teste de notificação
@@ -104,91 +130,90 @@ if (isset($_POST['test_notification'])) {
     
     $result = $notification->sendToUser(
         $users_id,
-        __('Notificação de Teste', 'glpipwa'),
-        __('Esta é uma notificação de teste do plugin PWA', 'glpipwa'),
+        __('Test Notification', 'glpipwa'),
+        __('This is a test notification from the PWA plugin', 'glpipwa'),
         ['type' => 'test']
     );
     
     if ($result) {
-        Session::addMessageAfterRedirect(__('Notificação de teste enviada', 'glpipwa'), true, INFO);
+        Session::addMessageAfterRedirect(__('Test notification sent', 'glpipwa'), true, INFO);
     } else {
-        Session::addMessageAfterRedirect(__('Erro ao enviar notificação de teste', 'glpipwa'), true, ERROR);
+        Session::addMessageAfterRedirect(__('Error sending test notification', 'glpipwa'), true, ERROR);
     }
     
-    Html::redirect($_SERVER['PHP_SELF']);
+    Html::redirect($plugin_url);
 }
 
 // Obter configurações atuais
 $config = PluginGlpipwaConfig::getAll();
 
 echo "<div class='center'>";
-echo "<form method='post' action='" . $_SERVER['PHP_SELF'] . "' enctype='multipart/form-data'>";
-echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken()]);
+echo "<form method='post' action='" . $plugin_url . "' enctype='multipart/form-data'>";
 echo "<table class='tab_cadre_fixe'>";
 
 // Seção Firebase
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Configuração Firebase', 'glpipwa') . "</th></tr>";
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Firebase Configuration', 'glpipwa') . "</th></tr>";
 
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('API Key', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_api_key' value='" . Html::entities($config['firebase_api_key'] ?? '') . "' size='60'></td>";
+echo "<td><input type='text' name='firebase_api_key' value='" . htmlspecialchars($config['firebase_api_key'] ?? '') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('Project ID', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_project_id' value='" . Html::entities($config['firebase_project_id'] ?? '') . "' size='60'></td>";
+echo "<td><input type='text' name='firebase_project_id' value='" . htmlspecialchars($config['firebase_project_id'] ?? '') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('Messaging Sender ID', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_messaging_sender_id' value='" . Html::entities($config['firebase_messaging_sender_id'] ?? '') . "' size='60'></td>";
+echo "<td><input type='text' name='firebase_messaging_sender_id' value='" . htmlspecialchars($config['firebase_messaging_sender_id'] ?? '') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('App ID', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_app_id' value='" . Html::entities($config['firebase_app_id'] ?? '') . "' size='60'></td>";
+echo "<td><input type='text' name='firebase_app_id' value='" . htmlspecialchars($config['firebase_app_id'] ?? '') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('VAPID Key', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_vapid_key' value='" . Html::entities($config['firebase_vapid_key'] ?? '') . "' size='60'></td>";
+echo "<td><input type='text' name='firebase_vapid_key' value='" . htmlspecialchars($config['firebase_vapid_key'] ?? '') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('Server Key', 'glpipwa') . "</td>";
-echo "<td><input type='password' name='firebase_server_key' value='" . Html::entities($config['firebase_server_key'] ?? '') . "' size='60'></td>";
+echo "<td><input type='password' name='firebase_server_key' value='" . htmlspecialchars($config['firebase_server_key'] ?? '') . "' size='60'></td>";
 echo "</tr>";
 
 // Seção PWA
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Configuração PWA', 'glpipwa') . "</th></tr>";
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Configuration', 'glpipwa') . "</th></tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Nome da Aplicação', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_name' value='" . Html::entities($config['pwa_name'] ?? 'GLPI Service Desk') . "' size='60'></td>";
+echo "<td>" . __('Application Name', 'glpipwa') . "</td>";
+echo "<td><input type='text' name='pwa_name' value='" . htmlspecialchars($config['pwa_name'] ?? 'GLPI Service Desk') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Nome Curto', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_short_name' value='" . Html::entities($config['pwa_short_name'] ?? 'GLPI') . "' size='60'></td>";
+echo "<td>" . __('Short Name', 'glpipwa') . "</td>";
+echo "<td><input type='text' name='pwa_short_name' value='" . htmlspecialchars($config['pwa_short_name'] ?? 'GLPI') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Cor do Tema', 'glpipwa') . "</td>";
-echo "<td><input type='color' name='pwa_theme_color' value='" . Html::entities($config['pwa_theme_color'] ?? '#0d6efd') . "'></td>";
+echo "<td>" . __('Theme Color', 'glpipwa') . "</td>";
+echo "<td><input type='color' name='pwa_theme_color' value='" . htmlspecialchars($config['pwa_theme_color'] ?? '#0d6efd') . "'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Cor de Fundo', 'glpipwa') . "</td>";
-echo "<td><input type='color' name='pwa_background_color' value='" . Html::entities($config['pwa_background_color'] ?? '#ffffff') . "'></td>";
+echo "<td>" . __('Background Color', 'glpipwa') . "</td>";
+echo "<td><input type='color' name='pwa_background_color' value='" . htmlspecialchars($config['pwa_background_color'] ?? '#ffffff') . "'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('URL Inicial', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_start_url' value='" . Html::entities($config['pwa_start_url'] ?? '/') . "' size='60'></td>";
+echo "<td>" . __('Start URL', 'glpipwa') . "</td>";
+echo "<td><input type='text' name='pwa_start_url' value='" . htmlspecialchars($config['pwa_start_url'] ?? '/') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Modo de Exibição', 'glpipwa') . "</td>";
+echo "<td>" . __('Display Mode', 'glpipwa') . "</td>";
 echo "<td>";
 echo "<select name='pwa_display'>";
 $displays = ['standalone' => __('Standalone', 'glpipwa'), 'fullscreen' => __('Fullscreen', 'glpipwa'), 'minimal-ui' => __('Minimal UI', 'glpipwa'), 'browser' => __('Browser', 'glpipwa')];
@@ -201,10 +226,10 @@ echo "</td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Orientação', 'glpipwa') . "</td>";
+echo "<td>" . __('Orientation', 'glpipwa') . "</td>";
 echo "<td>";
 echo "<select name='pwa_orientation'>";
-$orientations = ['any' => __('Qualquer', 'glpipwa'), 'portrait' => __('Retrato', 'glpipwa'), 'landscape' => __('Paisagem', 'glpipwa')];
+$orientations = ['any' => __('Any', 'glpipwa'), 'portrait' => __('Portrait', 'glpipwa'), 'landscape' => __('Landscape', 'glpipwa')];
 foreach ($orientations as $value => $label) {
     $selected = ($config['pwa_orientation'] ?? 'any') === $value ? 'selected' : '';
     echo "<option value='$value' $selected>$label</option>";
@@ -214,24 +239,24 @@ echo "</td>";
 echo "</tr>";
 
 // Seção Ícones
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Ícones', 'glpipwa') . "</th></tr>";
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Icons', 'glpipwa') . "</th></tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Ícone 192x192', 'glpipwa') . "</td>";
+echo "<td>" . __('Icon 192x192', 'glpipwa') . "</td>";
 echo "<td><input type='file' name='icon_192' accept='image/png'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Ícone 512x512', 'glpipwa') . "</td>";
+echo "<td>" . __('Icon 512x512', 'glpipwa') . "</td>";
 echo "<td><input type='file' name='icon_512' accept='image/png'></td>";
 echo "</tr>";
 
 // Botões
 echo "<tr class='tab_bg_2'>";
 echo "<td colspan='2' class='center'>";
-echo "<input type='submit' name='update' value='" . __('Salvar', 'glpipwa') . "' class='submit'>";
+echo "<input type='submit' name='update' value='" . __('Save', 'glpipwa') . "' class='submit'>";
 echo "&nbsp;";
-echo "<input type='submit' name='test_notification' value='" . __('Enviar Notificação de Teste', 'glpipwa') . "' class='submit'>";
+echo "<input type='submit' name='test_notification' value='" . __('Send Test Notification', 'glpipwa') . "' class='submit'>";
 echo "</td>";
 echo "</tr>";
 

@@ -30,11 +30,39 @@
  * ---------------------------------------------------------------------
  */
 
-include('../../../inc/includes.php');
+if (!defined('GLPI_ROOT')) {
+    define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
+}
+include(GLPI_ROOT . '/inc/includes.php');
 
-header('Content-Type: application/manifest+json');
+// Carregar classes do plugin
+plugin_glpipwa_load_classes();
+
+// Verificar se as classes necessárias estão disponíveis
+if (!class_exists('PluginGlpipwaManifest') || !class_exists('PluginGlpipwaConfig')) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Plugin classes not loaded']);
+    exit;
+}
+
+// Headers devem ser definidos antes de qualquer output
+header('Content-Type: application/manifest+json; charset=utf-8');
 header('Cache-Control: public, max-age=3600');
+header('X-Content-Type-Options: nosniff');
 
-$manifest = PluginGlpipwaManifest::generate();
-echo PluginGlpipwaManifest::toJSON();
-
+try {
+    $manifest = PluginGlpipwaManifest::generate();
+    echo PluginGlpipwaManifest::toJSON();
+    exit;
+} catch (Exception $e) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Error generating manifest: ' . $e->getMessage()]);
+    exit;
+} catch (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Error generating manifest: ' . $e->getMessage()]);
+    exit;
+}

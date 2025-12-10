@@ -77,8 +77,8 @@ if (FIREBASE_CONFIG.apiKey) {
         const notificationTitle = payload.notification?.title || 'GLPI';
         const notificationOptions = {
             body: payload.notification?.body || '',
-            icon: payload.notification?.icon || '/pics/logo-glpi.png',
-            badge: '/pics/logo-glpi.png',
+            icon: payload.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
+            badge: '/pics/logos/logo-GLPI-250-white.png',
             data: payload.data || {},
             tag: payload.data?.ticket_id || 'glpi-notification',
             requireInteraction: false,

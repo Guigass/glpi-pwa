@@ -31,30 +31,40 @@
  */
 
 if (!defined('GLPI_ROOT')) {
-    define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
-}
-include(GLPI_ROOT . '/inc/includes.php');
-
-header('Content-Type: application/json');
-
-// Verificar autenticação
-if (!Session::getLoginUserID()) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Não autenticado']);
-    exit;
+    die("Sorry. You can't access this file directly");
 }
 
-$config = PluginGlpipwaConfig::getAll();
+/**
+ * Classe auxiliar para servir arquivos estáticos de forma padronizada
+ */
+class PluginGlpipwaStaticFileServer
+{
+    /**
+     * Serve um arquivo estático com headers padronizados
+     *
+     * @param string $filePath Caminho completo do arquivo a ser servido
+     * @param string $contentType Content-Type do arquivo (ex: 'application/javascript')
+     * @param string $cacheControl Cache-Control header (padrão: 'public, max-age=3600')
+     * @return void
+     */
+    public static function serve($filePath, $contentType, $cacheControl = 'public, max-age=3600')
+    {
+        // Verificar se o arquivo existe
+        if (!file_exists($filePath) || !is_readable($filePath)) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo '// File not found';
+            exit;
+        }
 
-$firebaseConfig = [
-    'apiKey' => $config['firebase_api_key'] ?? '',
-    'authDomain' => ($config['firebase_project_id'] ?? '') . '.firebaseapp.com',
-    'projectId' => $config['firebase_project_id'] ?? '',
-    'storageBucket' => ($config['firebase_project_id'] ?? '') . '.appspot.com',
-    'messagingSenderId' => $config['firebase_messaging_sender_id'] ?? '',
-    'appId' => $config['firebase_app_id'] ?? '',
-    'vapidKey' => $config['firebase_vapid_key'] ?? '',
-];
+        // Definir headers padronizados
+        header('Content-Type: ' . $contentType . '; charset=utf-8');
+        header('Cache-Control: ' . $cacheControl);
+        header('X-Content-Type-Options: nosniff');
 
-echo json_encode($firebaseConfig);
+        // Servir o arquivo
+        readfile($filePath);
+        exit;
+    }
+}
 

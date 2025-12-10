@@ -46,7 +46,7 @@ self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') {
         return;
     }
-    
+
     // Ignorar requisições para APIs externas
     if (!event.request.url.startsWith(self.location.origin)) {
         return;
@@ -62,12 +62,12 @@ self.addEventListener('fetch', (event) => {
 
                 // Clonar a resposta antes de cachear
                 const responseToCache = response.clone();
-                
+
                 caches.open(CACHE_NAME)
                     .then((cache) => {
                         cache.put(event.request, responseToCache);
                     });
-                
+
                 return response;
             })
             .catch(() => {
@@ -80,7 +80,7 @@ self.addEventListener('fetch', (event) => {
 // Recebimento de notificações push
 self.addEventListener('push', (event) => {
     let data = {};
-    
+
     if (event.data) {
         try {
             data = event.data.json();
@@ -92,8 +92,8 @@ self.addEventListener('push', (event) => {
     const title = data.notification?.title || data.title || 'GLPI';
     const options = {
         body: data.notification?.body || data.body || '',
-        icon: data.notification?.icon || '/pics/logo-glpi.png',
-        badge: '/pics/logo-glpi.png',
+        icon: data.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
+        badge: '/pics/logos/logo-GLPI-250-white.png',
         data: data.data || {},
         tag: data.data?.ticket_id || 'glpi-notification',
         requireInteraction: false,
@@ -115,23 +115,23 @@ self.addEventListener('notificationclick', (event) => {
             type: 'window',
             includeUncontrolled: true,
         })
-        .then((windowClients) => {
-            // Verificar se já existe uma janela aberta com o GLPI
-            for (let client of windowClients) {
-                if (client.url.includes(self.location.origin) && 'focus' in client) {
-                    return client.focus().then(() => {
-                        // Navegar para a URL se necessário
-                        if (urlToOpen && client.url !== urlToOpen) {
-                            return client.navigate(urlToOpen);
-                        }
-                    });
+            .then((windowClients) => {
+                // Verificar se já existe uma janela aberta com o GLPI
+                for (let client of windowClients) {
+                    if (client.url.includes(self.location.origin) && 'focus' in client) {
+                        return client.focus().then(() => {
+                            // Navegar para a URL se necessário
+                            if (urlToOpen && client.url !== urlToOpen) {
+                                return client.navigate(urlToOpen);
+                            }
+                        });
+                    }
                 }
-            }
-            
-            // Se não houver janela aberta, abrir uma nova
-            if (clients.openWindow) {
-                return clients.openWindow(urlToOpen);
-            }
-        })
+
+                // Se não houver janela aberta, abrir uma nova
+                if (clients.openWindow) {
+                    return clients.openWindow(urlToOpen);
+                }
+            })
     );
 });

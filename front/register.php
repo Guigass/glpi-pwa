@@ -58,16 +58,39 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit;
 }
 
-// Validar CSRF token
+// Validar CSRF token ou Origin/Referer
 $csrfToken = $data['_glpi_csrf_token'] ?? '';
+$validCsrf = false;
+$validOrigin = false;
+
+// Tentar validar CSRF token
 if (!empty($csrfToken)) {
-    // Usar validação do GLPI se token fornecido
     $_POST['_glpi_csrf_token'] = $csrfToken;
-    if (!Session::validateCSRF(['_glpi_csrf_token' => $csrfToken])) {
-        // Se a validação de CSRF falhar, logar mas continuar
-        // Isso permite que tokens expirados ainda funcionem para registro de FCM
-        Toolbox::logDebug('GLPIPWA: CSRF token inválido ou expirado para registro de token FCM');
+    $validCsrf = Session::validateCSRF(['_glpi_csrf_token' => $csrfToken]);
+}
+
+// Validar Origin ou Referer como fallback para PWA
+if (!$validCsrf) {
+    $serverHost = $_SERVER['HTTP_HOST'] ?? '';
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $referer = $_SERVER['HTTP_REFERER'] ?? '';
+    
+    // Verificar se Origin ou Referer correspondem ao host do servidor
+    if (!empty($serverHost)) {
+        if (!empty($origin) && strpos($origin, $serverHost) !== false) {
+            $validOrigin = true;
+        } elseif (!empty($referer) && strpos($referer, $serverHost) !== false) {
+            $validOrigin = true;
+        }
     }
+}
+
+// Bloquear se nem CSRF nem Origin/Referer forem válidos
+if (!$validCsrf && !$validOrigin) {
+    Toolbox::logWarning('GLPIPWA: Tentativa de registro de token FCM sem CSRF ou Origin válido');
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Forbidden - Invalid security token']);
+    exit;
 }
 
 // Validar token FCM

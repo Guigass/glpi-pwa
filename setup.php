@@ -32,21 +32,56 @@
 
 define('PLUGIN_GLPIPWA_VERSION', '1.0.0');
 
-// Incluir classes
-require_once(__DIR__ . '/inc/Config.php');
-require_once(__DIR__ . '/inc/Token.php');
-require_once(__DIR__ . '/inc/NotificationPush.php');
-require_once(__DIR__ . '/inc/Manifest.php');
-require_once(__DIR__ . '/inc/Icon.php');
+/**
+ * Carrega as classes do plugin quando necessário
+ */
+function plugin_glpipwa_load_classes() {
+    static $loaded = false;
+    if (!$loaded && defined('GLPI_ROOT')) {
+        try {
+            $files = [
+                __DIR__ . '/inc/Config.php',
+                __DIR__ . '/inc/Token.php',
+                __DIR__ . '/inc/NotificationPush.php',
+                __DIR__ . '/inc/Manifest.php',
+                __DIR__ . '/inc/Icon.php',
+                __DIR__ . '/inc/Cron.php',
+                __DIR__ . '/inc/StaticFileServer.php',
+            ];
+            
+            foreach ($files as $file) {
+                if (file_exists($file)) {
+                    require_once($file);
+                }
+            }
+            $loaded = true;
+        } catch (Exception $e) {
+            // Silenciosamente ignora erros ao carregar classes
+        } catch (Throwable $e) {
+            // Silenciosamente ignora erros fatais também
+        }
+    }
+}
 
 /**
  * Hook executado durante a sequência de inicialização do GLPI, antes da sessão ser carregada
  * e antes da inicialização dos plugins ativos.
  */
 function plugin_glpipwa_boot() {
-    // Indica ao GLPI que o caminho `/plugins/glpipwa/api.php` é stateless e portanto
-    // não deve usar cookies de sessão nem verificar uma sessão válida.
-    \Glpi\Http\SessionManager::registerPluginStatelessPath('glpipwa', '#^/api\\.php#');
+    // Verificar se a classe SessionManager existe antes de usar
+    if (class_exists('\Glpi\Http\SessionManager') && method_exists('\Glpi\Http\SessionManager', 'registerPluginStatelessPath')) {
+        try {
+            // Indica ao GLPI que os seguintes caminhos são stateless e portanto
+            // não devem usar cookies de sessão nem verificar uma sessão válida.
+            // Isso é necessário para manifest, service workers e outros recursos públicos
+            // O padrão corresponde a: /plugins/glpipwa/front/(manifest|sw-proxy|sw|icon).php
+            \Glpi\Http\SessionManager::registerPluginStatelessPath('glpipwa', '#^/front/(manifest|sw-proxy|sw|icon)\\.php#');
+        } catch (Exception $e) {
+            // Silenciosamente ignora se não for possível registrar
+        } catch (Throwable $e) {
+            // Silenciosamente ignora erros fatais também
+        }
+    }
 }
 
 /**
@@ -55,17 +90,28 @@ function plugin_glpipwa_boot() {
 function plugin_init_glpipwa() {
     global $PLUGIN_HOOKS;
 
+    // Verificar se GLPI_ROOT está definido antes de continuar
+    if (!defined('GLPI_ROOT')) {
+        return;
+    }
+
+    // Carregar classes do plugin
+    plugin_glpipwa_load_classes();
+
+    // Registrar hooks básicos - sempre
     $PLUGIN_HOOKS['csrf_compliant']['glpipwa'] = true;
+    
+    // Hook de configuração - IMPORTANTE: sempre registrar para mostrar o ícone de engrenagem
     $PLUGIN_HOOKS['config_page']['glpipwa'] = 'front/config.form.php';
     
-    // Hook para adicionar manifest e scripts no head
-    $PLUGIN_HOOKS['add_javascript']['glpipwa'] = [
-        'js/register-sw.js',
-    ];
-    
-    $PLUGIN_HOOKS['add_html_header']['glpipwa'] = 'plugin_glpipwa_add_html_header';
+    // Hook para adicionar JavaScript em todas as páginas
+    // Segundo a documentação oficial do GLPI (https://glpi-developer-documentation.readthedocs.io/en/master/plugins/hooks.html)
+    // O hook add_javascript adiciona JavaScript em todas as páginas headers
+    // No GLPI 11, usamos um proxy PHP para servir o arquivo JS (front/glpipwa.php)
+    // que serve o arquivo js/glpipwa.js
+    $PLUGIN_HOOKS['add_javascript']['glpipwa'] = ['front/glpipwa.php'];
 
-    // Hooks de eventos do GLPI
+    // Hooks de eventos do GLPI para notificações
     $PLUGIN_HOOKS['item_add']['glpipwa'] = [
         'Ticket' => 'plugin_glpipwa_item_add',
         'ITILFollowup' => 'plugin_glpipwa_followup_add',
@@ -74,27 +120,18 @@ function plugin_init_glpipwa() {
     $PLUGIN_HOOKS['item_update']['glpipwa'] = [
         'Ticket' => 'plugin_glpipwa_item_update',
     ];
-
-    if (Session::haveRight('config', UPDATE)) {
-        $PLUGIN_HOOKS['menu_toadd']['glpipwa']['config'] = 'PluginGlpipwaConfig';
-    }
-}
-
-/**
- * Adiciona manifest no head
- */
-function plugin_glpipwa_add_html_header() {
-    $plugin_url = Plugin::getWebDir('glpipwa', false);
-    echo '<link rel="manifest" href="' . $plugin_url . '/front/manifest.php">' . "\n";
 }
 
 /**
  * Retorna informações de versão do plugin
+ * Esta função DEVE existir e ser acessível para o GLPI carregar o plugin
  */
 function plugin_version_glpipwa() {
+    // Não usar __() aqui pois pode não estar disponível quando o plugin é carregado
+    // Retornar array simples sem try/catch para evitar qualquer problema
     return [
-        'name'           => __('GLPI PWA', 'glpipwa'),
-        'version'        => PLUGIN_GLPIPWA_VERSION,
+        'name'           => 'GLPI PWA',
+        'version'        => defined('PLUGIN_GLPIPWA_VERSION') ? PLUGIN_GLPIPWA_VERSION : '1.0.0',
         'author'         => 'GLPI Community',
         'license'        => 'GPLv2+',
         'homepage'       => 'https://github.com/glpi-project/glpi-pwa',

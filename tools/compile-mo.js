@@ -170,22 +170,37 @@ function buildMo(entries) {
 
 // Main execution
 const baseDir = path.dirname(__dirname);
-const poFile = path.join(baseDir, 'locale', 'pt_BR.po');
-const moFile = path.join(baseDir, 'locale', 'pt_BR.mo');
+const localeDir = path.join(baseDir, 'locale');
 
 try {
-    if (!fs.existsSync(poFile)) {
-        console.error(`Arquivo PO não encontrado: ${poFile}`);
+    // Encontrar todos os arquivos .po
+    const files = fs.readdirSync(localeDir);
+    const poFiles = files.filter(f => f.endsWith('.po'));
+    
+    if (poFiles.length === 0) {
+        console.error(`Nenhum arquivo PO encontrado em: ${localeDir}`);
         process.exit(1);
     }
-
-    const poContent = fs.readFileSync(poFile, 'utf8');
-    const entries = parsePo(poContent);
-    const moBuffer = buildMo(entries);
     
-    fs.writeFileSync(moFile, moBuffer);
+    let compiled = 0;
     
-    console.log(`Arquivo compilado com sucesso: ${moFile} (${Object.keys(entries).length} strings)`);
+    for (const poFileName of poFiles) {
+        const poFile = path.join(localeDir, poFileName);
+        const moFile = poFile.replace(/\.po$/, '.mo');
+        
+        console.log(`Compilando: ${poFileName}...`);
+        
+        const poContent = fs.readFileSync(poFile, 'utf8');
+        const entries = parsePo(poContent);
+        const moBuffer = buildMo(entries);
+        
+        fs.writeFileSync(moFile, moBuffer);
+        
+        console.log(`  -> ${path.basename(moFile)} (${Object.keys(entries).length} strings)`);
+        compiled++;
+    }
+    
+    console.log(`\nCompilação concluída! ${compiled} arquivo(s) compilado(s).`);
     process.exit(0);
 } catch (error) {
     console.error('Erro na compilação:', error.message);

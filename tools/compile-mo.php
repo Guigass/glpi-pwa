@@ -176,19 +176,36 @@ function parsePoString($str) {
 
 // Main execution
 $baseDir = dirname(__DIR__);
-$poFile = $baseDir . '/locale/pt_BR.po';
-$moFile = $baseDir . '/locale/pt_BR.mo';
+$localeDir = $baseDir . '/locale';
 
-if (!file_exists($poFile)) {
-    echo "Arquivo PO não encontrado: $poFile\n";
+// Encontrar todos os arquivos .po
+$poFiles = glob($localeDir . '/*.po');
+
+if (empty($poFiles)) {
+    echo "Nenhum arquivo PO encontrado em: $localeDir\n";
     exit(1);
 }
 
-if (poToMo($poFile, $moFile)) {
-    echo "Compilação concluída com sucesso!\n";
+$success = true;
+$compiled = 0;
+
+foreach ($poFiles as $poFile) {
+    $moFile = preg_replace('/\.po$/', '.mo', $poFile);
+    
+    echo "Compilando: " . basename($poFile) . "...\n";
+    
+    if (poToMo($poFile, $moFile)) {
+        $compiled++;
+    } else {
+        $success = false;
+    }
+}
+
+if ($success) {
+    echo "\nCompilação concluída! $compiled arquivo(s) compilado(s).\n";
     exit(0);
 } else {
-    echo "Erro na compilação!\n";
+    echo "\nAlguns arquivos falharam na compilação.\n";
     exit(1);
 }
 

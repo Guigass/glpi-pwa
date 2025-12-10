@@ -34,16 +34,40 @@ if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
 }
 
-// Incluir classes necessárias
-require_once(__DIR__ . '/inc/NotificationPush.php');
+/**
+ * Carrega as classes necessárias do plugin
+ */
+function plugin_glpipwa_load_hook_classes() {
+    static $loaded = false;
+    if (!$loaded) {
+        require_once(__DIR__ . '/inc/NotificationPush.php');
+        $loaded = true;
+    }
+}
 
 /**
  * Hook chamado quando um item é adicionado
  */
 function plugin_glpipwa_item_add($item) {
-    if ($item instanceof Ticket) {
-        $notification = new PluginGlpipwaNotificationPush();
-        $notification->notifyNewTicket($item);
+    try {
+        // Verificar se a classe Ticket existe antes de usar instanceof
+        if (!class_exists('Ticket')) {
+            return;
+        }
+        
+        if ($item instanceof Ticket) {
+            plugin_glpipwa_load_hook_classes();
+            
+            if (class_exists('PluginGlpipwaNotificationPush')) {
+                $notification = new PluginGlpipwaNotificationPush();
+                $notification->notifyNewTicket($item);
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciosamente ignora erros para não quebrar o fluxo do GLPI
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_item_add - " . $e->getMessage());
+        }
     }
 }
 
@@ -51,9 +75,25 @@ function plugin_glpipwa_item_add($item) {
  * Hook chamado quando um item é atualizado
  */
 function plugin_glpipwa_item_update($item) {
-    if ($item instanceof Ticket) {
-        $notification = new PluginGlpipwaNotificationPush();
-        $notification->notifyTicketUpdate($item);
+    try {
+        // Verificar se a classe Ticket existe antes de usar instanceof
+        if (!class_exists('Ticket')) {
+            return;
+        }
+        
+        if ($item instanceof Ticket) {
+            plugin_glpipwa_load_hook_classes();
+            
+            if (class_exists('PluginGlpipwaNotificationPush')) {
+                $notification = new PluginGlpipwaNotificationPush();
+                $notification->notifyTicketUpdate($item);
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciosamente ignora erros para não quebrar o fluxo do GLPI
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_item_update - " . $e->getMessage());
+        }
     }
 }
 
@@ -61,9 +101,25 @@ function plugin_glpipwa_item_update($item) {
  * Hook chamado quando um follow-up é adicionado
  */
 function plugin_glpipwa_followup_add($item) {
-    if ($item instanceof ITILFollowup) {
-        $notification = new PluginGlpipwaNotificationPush();
-        $notification->notifyNewFollowup($item);
+    try {
+        // Verificar se a classe ITILFollowup existe antes de usar instanceof
+        if (!class_exists('ITILFollowup')) {
+            return;
+        }
+        
+        if ($item instanceof ITILFollowup) {
+            plugin_glpipwa_load_hook_classes();
+            
+            if (class_exists('PluginGlpipwaNotificationPush')) {
+                $notification = new PluginGlpipwaNotificationPush();
+                $notification->notifyNewFollowup($item);
+            }
+        }
+    } catch (Exception $e) {
+        // Silenciosamente ignora erros para não quebrar o fluxo do GLPI
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_followup_add - " . $e->getMessage());
+        }
     }
 }
 
@@ -75,35 +131,52 @@ function plugin_glpipwa_followup_add($item) {
 function plugin_glpipwa_install() {
     global $DB;
 
-    $migration = new Migration(PLUGIN_GLPIPWA_VERSION);
-    
-    // Incluir classes necessárias
-    require_once(__DIR__ . '/inc/Config.php');
+    try {
+        // Verificar se as classes necessárias existem
+        if (!class_exists('Migration')) {
+            return false;
+        }
+        
+        $migration = new Migration(PLUGIN_GLPIPWA_VERSION);
+        
+        // Incluir classes necessárias
+        require_once(__DIR__ . '/inc/Config.php');
+        require_once(__DIR__ . '/inc/Cron.php');
+        
+        if (!class_exists('PluginGlpipwaConfig')) {
+            return false;
+        }
 
-    // Criar tabela de tokens FCM usando Migration
-    if (!$DB->tableExists('glpi_plugin_glpipwa_tokens')) {
+        // Criar tabela de tokens FCM usando Migration
         $table = 'glpi_plugin_glpipwa_tokens';
         
-        $migration->displayMessage("Criando tabela $table...");
+        // Se a tabela já existe, dropar para recriar com a estrutura correta
+        if ($DB->tableExists($table)) {
+            $migration->displayMessage("Removendo tabela $table existente...");
+            $migration->dropTable($table);
+        }
         
-        $query = "CREATE TABLE `$table` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `users_id` int(11) NOT NULL,
-            `token` varchar(255) NOT NULL,
-            `user_agent` varchar(255) DEFAULT NULL,
-            `date_creation` datetime DEFAULT NULL,
-            `date_mod` datetime DEFAULT NULL,
-            PRIMARY KEY (`id`),
-            UNIQUE KEY `token` (`token`),
-            KEY `users_id` (`users_id`),
-            KEY `date_mod` (`date_mod`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
-        
-        $DB->doQuery($query);
-    }
+            $migration->displayMessage("Criando tabela $table...");
+            
+            // Criar tabela usando SQL direto mas com tipos corretos para GLPI 11
+            $query = "CREATE TABLE `$table` (
+            `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+            `users_id` int UNSIGNED NOT NULL,
+                `token` varchar(255) NOT NULL,
+                `user_agent` varchar(255) DEFAULT NULL,
+                `date_creation` timestamp NULL DEFAULT NULL,
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `token` (`token`),
+                KEY `users_id` (`users_id`),
+                KEY `date_mod` (`date_mod`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+            
+            $DB->doQuery($query);
+            $migration->migrationOneTable($table);
 
-    // Configurações padrão
-    $defaults = [
+        // Configurações padrão
+        $defaults = [
         'firebase_api_key' => '',
         'firebase_project_id' => '',
         'firebase_messaging_sender_id' => '',
@@ -116,12 +189,23 @@ function plugin_glpipwa_install() {
         'pwa_background_color' => '#ffffff',
         'pwa_start_url' => '/',
         'pwa_display' => 'standalone',
-        'pwa_orientation' => 'any',
-    ];
+            'pwa_orientation' => 'any',
+        ];
 
-    PluginGlpipwaConfig::setMultiple($defaults);
+        PluginGlpipwaConfig::setMultiple($defaults);
 
-    return true;
+        // Registrar tarefa cron para limpeza de tokens
+        if (class_exists('PluginGlpipwaCron')) {
+            PluginGlpipwaCron::install();
+        }
+
+        return true;
+    } catch (Exception $e) {
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro na instalação - " . $e->getMessage());
+        }
+        return false;
+    }
 }
 
 /**
@@ -132,10 +216,26 @@ function plugin_glpipwa_install() {
 function plugin_glpipwa_uninstall() {
     global $DB;
 
-    $migration = new Migration(PLUGIN_GLPIPWA_VERSION);
-    
-    // Incluir classes necessárias
-    require_once(__DIR__ . '/inc/Config.php');
+    try {
+        // Verificar se as classes necessárias existem
+        if (!class_exists('Migration')) {
+            return false;
+        }
+        
+        $migration = new Migration(PLUGIN_GLPIPWA_VERSION);
+        
+        // Incluir classes necessárias
+        require_once(__DIR__ . '/inc/Config.php');
+        require_once(__DIR__ . '/inc/Cron.php');
+        
+        if (!class_exists('Config')) {
+            return false;
+        }
+        
+        // Remover tarefa cron
+        if (class_exists('PluginGlpipwaCron')) {
+            PluginGlpipwaCron::uninstall();
+        }
 
     // Remover tabela de tokens usando Migration
     $table = 'glpi_plugin_glpipwa_tokens';
@@ -144,10 +244,16 @@ function plugin_glpipwa_uninstall() {
         $migration->dropTable($table);
     }
 
-    // Remover configurações
-    $config = new Config();
-    $config->deleteByCriteria(['context' => 'plugin:glpipwa'], true);
+        // Remover configurações
+        $config = new Config();
+        $config->deleteByCriteria(['context' => 'plugin:glpipwa'], true);
 
-    return true;
+        return true;
+    } catch (Exception $e) {
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro na desinstalação - " . $e->getMessage());
+        }
+        return false;
+    }
 }
 

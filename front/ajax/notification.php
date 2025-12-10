@@ -52,6 +52,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $input = file_get_contents('php://input');
 $data = json_decode($input, true);
 
+// Validar CSRF token
+$csrfToken = $data['_glpi_csrf_token'] ?? '';
+if (!empty($csrfToken)) {
+    $_POST['_glpi_csrf_token'] = $csrfToken;
+    if (!Session::validateCSRF(['_glpi_csrf_token' => $csrfToken])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Token de segurança inválido']);
+        exit;
+    }
+} else {
+    // CSRF token é obrigatório para este endpoint administrativo
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Token de segurança ausente']);
+    exit;
+}
+
 if (!isset($data['users_id']) || !isset($data['title']) || !isset($data['body'])) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Dados incompletos']);

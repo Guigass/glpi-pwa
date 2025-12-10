@@ -35,7 +35,10 @@
  * Este arquivo permite que o SW controle todo o GLPI usando o header Service-Worker-Allowed
  */
 
-include('../../../inc/includes.php');
+if (!defined('GLPI_ROOT')) {
+    define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
+}
+include(GLPI_ROOT . '/inc/includes.php');
 
 // Obter configuração Firebase para injetar no SW
 $config = PluginGlpipwaConfig::getAll();
@@ -86,8 +89,8 @@ if (FIREBASE_CONFIG.apiKey) {
         const notificationTitle = payload.notification?.title || 'GLPI';
         const notificationOptions = {
             body: payload.notification?.body || '',
-            icon: payload.notification?.icon || '/pics/logo-glpi.png',
-            badge: '/pics/logo-glpi.png',
+            icon: payload.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
+            badge: '/pics/logos/logo-GLPI-250-white.png',
             data: payload.data || {},
             tag: payload.data?.ticket_id || 'glpi-notification',
             requireInteraction: false,
@@ -179,8 +182,8 @@ self.addEventListener('push', (event) => {
     const title = data.notification?.title || data.title || 'GLPI';
     const options = {
         body: data.notification?.body || data.body || '',
-        icon: data.notification?.icon || '/pics/logo-glpi.png',
-        badge: '/pics/logo-glpi.png',
+        icon: data.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
+        badge: '/pics/logos/logo-GLPI-250-white.png',
         data: data.data || {},
         tag: data.data?.ticket_id || 'glpi-notification',
         requireInteraction: false,

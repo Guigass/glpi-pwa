@@ -147,10 +147,20 @@ class PluginGlpipwaNotificationPush
         // Verificar se o token é inválido
         if (isset($response['results'][0]['error'])) {
             $error = $response['results'][0]['error'];
-            if (in_array($error, ['InvalidRegistration', 'NotRegistered'])) {
+            // Lista de erros que indicam token inválido ou expirado
+            $invalidTokenErrors = [
+                'InvalidRegistration',      // Token mal formatado
+                'NotRegistered',            // Token não está mais registrado
+                'MismatchSenderId',         // Token registrado com outro sender
+                'InvalidPackageName',       // Nome do pacote inválido
+                'InvalidApnsCredential',    // Credenciais APNS inválidas (iOS)
+            ];
+            
+            if (in_array($error, $invalidTokenErrors)) {
                 // Token inválido, remover do banco
                 if (isset($message['to'])) {
                     PluginGlpipwaToken::deleteToken($message['to']);
+                    Toolbox::logDebug("GLPIPWA: Token removido devido a erro FCM: " . $error);
                 }
             }
             return false;
@@ -160,21 +170,37 @@ class PluginGlpipwaNotificationPush
     }
 
     /**
+     * Verifica se o Firebase está configurado corretamente
+     * 
+     * @return bool
+     */
+    private function isFirebaseConfigured()
+    {
+        $config = PluginGlpipwaConfig::getAll();
+        return PluginGlpipwaConfig::validateFirebaseConfig($config);
+    }
+
+    /**
      * Notifica sobre novo ticket
      */
     public function notifyNewTicket(Ticket $ticket)
     {
-        $recipients = $this->getTicketRecipients($ticket);
+        // Verificar se Firebase está configurado
+        if (!$this->isFirebaseConfigured()) {
+            return;
+        }
+
+        $recipients = $this->getTicketRecipients($ticket, true);
         
         if (empty($recipients)) {
             return;
         }
 
-        $title = sprintf(__('Novo Chamado #%d', 'glpipwa'), $ticket->getID());
+        $title = sprintf(__('New Ticket #%d', 'glpipwa'), $ticket->getID());
         $urgency = $ticket->getField('urgency');
         $urgencyName = Ticket::getUrgencyName($urgency);
         $body = sprintf(
-            __('Chamado aberto por %s - Urgência: %s', 'glpipwa'),
+            __('Ticket opened by %s - Urgency: %s', 'glpipwa'),
             $ticket->getField('name'),
             $urgencyName
         );
@@ -193,14 +219,19 @@ class PluginGlpipwaNotificationPush
      */
     public function notifyTicketUpdate(Ticket $ticket)
     {
-        $recipients = $this->getTicketRecipients($ticket);
+        // Verificar se Firebase está configurado
+        if (!$this->isFirebaseConfigured()) {
+            return;
+        }
+
+        $recipients = $this->getTicketRecipients($ticket, false);
         
         if (empty($recipients)) {
             return;
         }
 
-        $title = sprintf(__('Atualização no Chamado #%d', 'glpipwa'), $ticket->getID());
-        $body = __('O chamado foi atualizado', 'glpipwa');
+        $title = sprintf(__('Ticket #%d Updated', 'glpipwa'), $ticket->getID());
+        $body = __('The ticket has been updated', 'glpipwa');
 
         $data = [
             'url' => $ticket->getLinkURL(),
@@ -216,13 +247,23 @@ class PluginGlpipwaNotificationPush
      */
     public function notifyNewFollowup(ITILFollowup $followup)
     {
+        // Verificar se Firebase está configurado
+        if (!$this->isFirebaseConfigured()) {
+            return;
+        }
+
+        // Verificar se a classe Ticket existe antes de usar instanceof
+        if (!class_exists('Ticket')) {
+            return;
+        }
+        
         $item = $followup->getItem();
         
         if (!$item instanceof Ticket) {
             return;
         }
 
-        $recipients = $this->getTicketRecipients($item);
+        $recipients = $this->getTicketRecipients($item, false);
         
         // Remover o autor do follow-up dos destinatários
         $author_id = $followup->getField('users_id');
@@ -234,12 +275,20 @@ class PluginGlpipwaNotificationPush
             return;
         }
 
-        $user = new User();
-        $user->getFromDB($author_id);
-        $authorName = $user->getName();
+        $authorName = __('User', 'glpipwa');
+        if (class_exists('User')) {
+            try {
+                $user = new User();
+                if ($user->getFromDB($author_id)) {
+                    $authorName = $user->getName();
+                }
+            } catch (Exception $e) {
+                // Usa nome padrão se não conseguir obter o nome do usuário
+            }
+        }
 
-        $title = sprintf(__('Nova interação no Chamado #%d', 'glpipwa'), $item->getID());
-        $body = sprintf(__('%s comentou: %s', 'glpipwa'), $authorName, substr($followup->getField('content'), 0, 100));
+        $title = sprintf(__('New interaction on Ticket #%d', 'glpipwa'), $item->getID());
+        $body = sprintf(__('%s commented: %s', 'glpipwa'), $authorName, substr($followup->getField('content'), 0, 100));
 
         $data = [
             'url' => $item->getLinkURL(),
@@ -252,8 +301,12 @@ class PluginGlpipwaNotificationPush
 
     /**
      * Obtém destinatários de notificação para um ticket
+     * 
+     * @param Ticket $ticket O ticket para obter destinatários
+     * @param bool $isNewTicket Se é um novo ticket (para excluir o criador)
+     * @return array Lista de IDs de usuários destinatários
      */
-    private function getTicketRecipients(Ticket $ticket)
+    private function getTicketRecipients(Ticket $ticket, bool $isNewTicket = false)
     {
         $recipients = [];
 
@@ -265,38 +318,65 @@ class PluginGlpipwaNotificationPush
 
         // Grupo técnico
         $tech_group = $ticket->getField('groups_id_tech');
-        if ($tech_group > 0) {
-            $group = new Group();
-            if ($group->getFromDB($tech_group)) {
-                $groupUsers = Group_User::getGroupUsers($tech_group);
-                foreach ($groupUsers as $user) {
-                    $recipients[] = $user['id'];
+        if ($tech_group > 0 && class_exists('Group') && class_exists('Group_User')) {
+            try {
+                $group = new Group();
+                if ($group->getFromDB($tech_group)) {
+                    $groupUsers = Group_User::getGroupUsers($tech_group);
+                    foreach ($groupUsers as $user) {
+                        $recipients[] = $user['id'];
+                    }
                 }
+            } catch (Exception $e) {
+                // Silenciosamente ignora erros
             }
         }
 
-        // Observadores
-        $observer = new Ticket_User();
-        $observers = $observer->find(['tickets_id' => $ticket->getID(), 'type' => CommonITILActor::OBSERVER]);
-        foreach ($observers as $obs) {
-            $recipients[] = $obs['users_id'];
+        // Observadores via Ticket_User
+        if (class_exists('Ticket_User') && class_exists('CommonITILActor')) {
+            try {
+                $ticket_user = new Ticket_User();
+                $observers = $ticket_user->find([
+                    'tickets_id' => $ticket->getID(),
+                    'type' => CommonITILActor::OBSERVER
+                ]);
+                foreach ($observers as $obs) {
+                    $recipients[] = $obs['users_id'];
+                }
+            } catch (Exception $e) {
+                // Silenciosamente ignora erros
+            }
         }
 
-        // Requerente (para atualizações)
-        $requester_id = $ticket->getField('users_id_recipient');
-        if ($requester_id > 0) {
-            $recipients[] = $requester_id;
+        // Solicitantes via Ticket_User (pode haver múltiplos)
+        if (class_exists('Ticket_User') && class_exists('CommonITILActor')) {
+            try {
+                $ticket_user = new Ticket_User();
+                $requesters = $ticket_user->find([
+                    'tickets_id' => $ticket->getID(),
+                    'type' => CommonITILActor::REQUESTER
+                ]);
+                foreach ($requesters as $req) {
+                    $recipients[] = $req['users_id'];
+                }
+            } catch (Exception $e) {
+                // Silenciosamente ignora erros
+            }
         }
 
         // Remover duplicatas
         $recipients = array_unique($recipients);
         
-        // Remover o autor do ticket se for criação
-        $creator_id = $ticket->getField('users_id_recipient');
-        if ($creator_id > 0) {
-            $recipients = array_filter($recipients, function($id) use ($creator_id) {
-                return $id != $creator_id;
-            });
+        // Se for novo ticket, remover apenas o criador real (quem registrou o chamado)
+        // Isso permite que solicitantes diferentes do criador recebam notificação
+        if ($isNewTicket) {
+            // users_id_recipient é quem criou o registro no sistema
+            $creator_id = $ticket->getField('users_id_recipient');
+            if ($creator_id > 0) {
+                $recipients = array_filter($recipients, function($id) use ($creator_id) {
+                    return $id != $creator_id;
+                });
+            }
         }
 
         return array_values($recipients);

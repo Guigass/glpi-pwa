@@ -1,0 +1,266 @@
+# GLPI PWA Plugin - English (UK) Translation
+# Copyright (C) 2024 GLPI Community
+# This file is distributed under the same license as the GLPI PWA plugin.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: GLPI PWA 1.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: 2024-01-01 00:00+0000\n"
+"Last-Translator: GLPI Community\n"
+"Language-Team: English (UK)\n"
+"Language: en_GB\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "GLPI PWA"
+msgstr "GLPI PWA"
+
+msgid "PWA Configuration"
+msgstr "PWA Configuration"
+
+msgid "Firebase Configuration"
+msgstr "Firebase Configuration"
+
+msgid "API Key"
+msgstr "API Key"
+
+msgid "Project ID"
+msgstr "Project ID"
+
+msgid "Messaging Sender ID"
+msgstr "Messaging Sender ID"
+
+msgid "App ID"
+msgstr "App ID"
+
+msgid "VAPID Key"
+msgstr "VAPID Key"
+
+msgid "Server Key"
+msgstr "Server Key"
+
+msgid "Application Name"
+msgstr "Application Name"
+
+msgid "Short Name"
+msgstr "Short Name"
+
+msgid "Theme Color"
+msgstr "Theme Colour"
+
+msgid "Background Color"
+msgstr "Background Colour"
+
+msgid "Start URL"
+msgstr "Start URL"
+
+msgid "Display Mode"
+msgstr "Display Mode"
+
+msgid "Orientation"
+msgstr "Orientation"
+
+msgid "Icons"
+msgstr "Icons"
+
+msgid "Icon 192x192"
+msgstr "Icon 192x192"
+
+msgid "Icon 512x512"
+msgstr "Icon 512x512"
+
+msgid "Save"
+msgstr "Save"
+
+msgid "Send Test Notification"
+msgstr "Send Test Notification"
+
+msgid "Standalone"
+msgstr "Standalone"
+
+msgid "Fullscreen"
+msgstr "Fullscreen"
+
+msgid "Minimal UI"
+msgstr "Minimal UI"
+
+msgid "Browser"
+msgstr "Browser"
+
+msgid "Any"
+msgstr "Any"
+
+msgid "Portrait"
+msgstr "Portrait"
+
+msgid "Landscape"
+msgstr "Landscape"
+
+msgid "Settings saved successfully"
+msgstr "Settings saved successfully"
+
+msgid "Error validating settings"
+msgstr "Error validating settings"
+
+msgid "Invalid security token"
+msgstr "Invalid security token"
+
+msgid "Test Notification"
+msgstr "Test Notification"
+
+msgid "This is a test notification from the PWA plugin"
+msgstr "This is a test notification from the PWA plugin"
+
+msgid "Test notification sent"
+msgstr "Test notification sent"
+
+msgid "Error sending test notification"
+msgstr "Error sending test notification"
+
+msgid "New Ticket #%d"
+msgstr "New Ticket #%d"
+
+msgid "Ticket opened by %s - Urgency: %s"
+msgstr "Ticket opened by %s - Urgency: %s"
+
+msgid "Ticket #%d Updated"
+msgstr "Ticket #%d Updated"
+
+msgid "The ticket has been updated"
+msgstr "The ticket has been updated"
+
+msgid "New interaction on Ticket #%d"
+msgstr "New interaction on Ticket #%d"
+
+msgid "%s commented: %s"
+msgstr "%s commented: %s"
+
+msgid "User"
+msgstr "User"
+
+msgid "GLPI PWA Token Cleanup"
+msgstr "GLPI PWA Token Cleanup"
+
+msgid "Clean expired FCM tokens"
+msgstr "Clean expired FCM tokens"
+
+msgid "Invalid icon size"
+msgstr "Invalid icon size"
+
+msgid "No file uploaded"
+msgstr "No file uploaded"
+
+msgid "File exceeds upload_max_filesize directive"
+msgstr "File exceeds upload_max_filesize directive"
+
+msgid "File exceeds MAX_FILE_SIZE directive"
+msgstr "File exceeds MAX_FILE_SIZE directive"
+
+msgid "File was only partially uploaded"
+msgstr "File was only partially uploaded"
+
+msgid "Missing temporary folder"
+msgstr "Missing temporary folder"
+
+msgid "Failed to write file to disk"
+msgstr "Failed to write file to disk"
+
+msgid "A PHP extension stopped the file upload"
+msgstr "A PHP extension stopped the file upload"
+
+msgid "Unknown upload error"
+msgstr "Unknown upload error"
+
+msgid "GD extension is not available"
+msgstr "GD extension is not available"
+
+msgid "Could not determine file type"
+msgstr "Could not determine file type"
+
+msgid "Invalid file type. Only PNG images are allowed"
+msgstr "Invalid file type. Only PNG images are allowed"
+
+msgid "File size exceeds 2MB limit"
+msgstr "File size exceeds 2MB limit"
+
+msgid "Could not create icons directory. Check permissions"
+msgstr "Could not create icons directory. Check permissions"
+
+msgid "Icons directory does not exist and could not be created"
+msgstr "Icons directory does not exist and could not be created"
+
+msgid "Parent directory is also not writable"
+msgstr "Parent directory is also not writable"
+
+msgid "Icons directory is not writable. Check permissions"
+msgstr "Icons directory is not writable. Check permissions"
+
+msgid "Icons directory is not writable"
+msgstr "Icons directory is not writable"
+
+msgid "To fix this, run the following command as root"
+msgstr "To fix this, run the following command as root"
+
+msgid "Could not load image. File may be corrupted or not a valid PNG"
+msgstr "Could not load image. File may be corrupted or not a valid PNG"
+
+msgid "Could not create resized image"
+msgstr "Could not create resized image"
+
+msgid "Could not save icon file. Check directory permissions"
+msgstr "Could not save icon file. Check directory permissions"
+
+msgid "Icon %dx%d uploaded successfully"
+msgstr "Icon %dx%d uploaded successfully"
+
+msgid "Icon 192x192: File exceeds upload_max_filesize directive"
+msgstr "Icon 192x192: File exceeds upload_max_filesize directive"
+
+msgid "Icon 192x192: File exceeds MAX_FILE_SIZE directive"
+msgstr "Icon 192x192: File exceeds MAX_FILE_SIZE directive"
+
+msgid "Icon 192x192: File was only partially uploaded"
+msgstr "Icon 192x192: File was only partially uploaded"
+
+msgid "Icon 192x192: No file was uploaded"
+msgstr "Icon 192x192: No file was uploaded"
+
+msgid "Icon 192x192: Missing temporary folder"
+msgstr "Icon 192x192: Missing temporary folder"
+
+msgid "Icon 192x192: Failed to write file to disk"
+msgstr "Icon 192x192: Failed to write file to disk"
+
+msgid "Icon 192x192: A PHP extension stopped the file upload"
+msgstr "Icon 192x192: A PHP extension stopped the file upload"
+
+msgid "Icon 192x192: Unknown upload error"
+msgstr "Icon 192x192: Unknown upload error"
+
+msgid "Icon 512x512: File exceeds upload_max_filesize directive"
+msgstr "Icon 512x512: File exceeds upload_max_filesize directive"
+
+msgid "Icon 512x512: File exceeds MAX_FILE_SIZE directive"
+msgstr "Icon 512x512: File exceeds MAX_FILE_SIZE directive"
+
+msgid "Icon 512x512: File was only partially uploaded"
+msgstr "Icon 512x512: File was only partially uploaded"
+
+msgid "Icon 512x512: No file was uploaded"
+msgstr "Icon 512x512: No file was uploaded"
+
+msgid "Icon 512x512: Missing temporary folder"
+msgstr "Icon 512x512: Missing temporary folder"
+
+msgid "Icon 512x512: Failed to write file to disk"
+msgstr "Icon 512x512: Failed to write file to disk"
+
+msgid "Icon 512x512: A PHP extension stopped the file upload"
+msgstr "Icon 512x512: A PHP extension stopped the file upload"
+
+msgid "Icon 512x512: Unknown upload error"
+msgstr "Icon 512x512: Unknown upload error"
+

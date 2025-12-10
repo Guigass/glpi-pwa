@@ -35,26 +35,23 @@ if (!defined('GLPI_ROOT')) {
 }
 include(GLPI_ROOT . '/inc/includes.php');
 
-header('Content-Type: application/json');
+// Carregar classes do plugin
+plugin_glpipwa_load_classes();
 
-// Verificar autenticação
-if (!Session::getLoginUserID()) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Não autenticado']);
-    exit;
+// Obter tamanho do ícone (192 ou 512)
+$size = isset($_GET['size']) ? (int)$_GET['size'] : 192;
+if (!in_array($size, [192, 512])) {
+    $size = 192;
 }
 
-$config = PluginGlpipwaConfig::getAll();
+// Construir caminho do arquivo de ícone
+$plugin_root = dirname(__DIR__);
+$plugin_root_real = realpath($plugin_root);
+if ($plugin_root_real === false) {
+    $plugin_root_real = $plugin_root;
+}
+$icon_file = $plugin_root_real . DIRECTORY_SEPARATOR . 'pics' . DIRECTORY_SEPARATOR . 'icon-' . $size . '.png';
 
-$firebaseConfig = [
-    'apiKey' => $config['firebase_api_key'] ?? '',
-    'authDomain' => ($config['firebase_project_id'] ?? '') . '.firebaseapp.com',
-    'projectId' => $config['firebase_project_id'] ?? '',
-    'storageBucket' => ($config['firebase_project_id'] ?? '') . '.appspot.com',
-    'messagingSenderId' => $config['firebase_messaging_sender_id'] ?? '',
-    'appId' => $config['firebase_app_id'] ?? '',
-    'vapidKey' => $config['firebase_vapid_key'] ?? '',
-];
-
-echo json_encode($firebaseConfig);
+// Servir o arquivo usando a classe auxiliar padronizada
+PluginGlpipwaStaticFileServer::serve($icon_file, 'image/png', 'public, max-age=86400');
 

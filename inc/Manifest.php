@@ -46,10 +46,13 @@ class PluginGlpipwaManifest
     {
         $config = PluginGlpipwaConfig::getAll();
         
+        $start_url = $config['pwa_start_url'] ?? '/';
+        
         $manifest = [
             'name' => $config['pwa_name'] ?? 'GLPI Service Desk',
             'short_name' => $config['pwa_short_name'] ?? 'GLPI',
-            'start_url' => $config['pwa_start_url'] ?? '/',
+            'id' => $start_url, // App ID que corresponde à identidade atual
+            'start_url' => $start_url,
             'display' => $config['pwa_display'] ?? 'standalone',
             'background_color' => $config['pwa_background_color'] ?? '#ffffff',
             'theme_color' => $config['pwa_theme_color'] ?? '#0d6efd',
@@ -69,10 +72,9 @@ class PluginGlpipwaManifest
     private static function getIcons()
     {
         $icons = [];
-        $icon = new PluginGlpipwaIcon();
 
         // Ícone 192x192
-        $icon192 = $icon->getPath(192);
+        $icon192 = PluginGlpipwaIcon::getPath(192);
         if ($icon192) {
             $icons[] = [
                 'src' => $icon192,
@@ -82,7 +84,7 @@ class PluginGlpipwaManifest
         }
 
         // Ícone 512x512
-        $icon512 = $icon->getPath(512);
+        $icon512 = PluginGlpipwaIcon::getPath(512);
         if ($icon512) {
             $icons[] = [
                 'src' => $icon512,
@@ -95,12 +97,12 @@ class PluginGlpipwaManifest
         if (empty($icons)) {
             $icons = [
                 [
-                    'src' => '/pics/logo-glpi.png',
+                    'src' => '/pics/logos/logo-GLPI-250-white.png',
                     'sizes' => '192x192',
                     'type' => 'image/png',
                 ],
                 [
-                    'src' => '/pics/logo-glpi.png',
+                    'src' => '/pics/logos/logo-GLPI-250-white.png',
                     'sizes' => '512x512',
                     'type' => 'image/png',
                 ],
