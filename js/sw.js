@@ -40,22 +40,74 @@ self.addEventListener('activate', (event) => {
     return self.clients.claim();
 });
 
+// Função auxiliar para verificar se uma URL é de autenticação
+function isAuthUrl(url) {
+    const urlLower = url.toLowerCase();
+    const authPatterns = [
+        '/front/login.php',
+        '/index.php',
+        '/login',
+        '/logout',
+        'ajax/login.php',
+        'ajax/logout.php'
+    ];
+
+    return authPatterns.some(pattern => urlLower.includes(pattern));
+}
+
+// Função auxiliar para verificar se uma resposta indica autenticação necessária
+function isAuthResponse(response) {
+    // Não cachear respostas de redirecionamento ou erro de autenticação
+    if (!response) {
+        return true;
+    }
+
+    const status = response.status;
+    if (status === 302 || status === 401 || status === 403) {
+        return true;
+    }
+
+    // Verificar se há redirecionamento para login no header Location
+    const location = response.headers.get('Location');
+    if (location && isAuthUrl(location)) {
+        return true;
+    }
+
+    return false;
+}
+
 // Interceptação de requisições (estratégia network-first)
 self.addEventListener('fetch', (event) => {
+    const requestUrl = event.request.url;
+
     // Ignorar requisições não-GET
     if (event.request.method !== 'GET') {
         return;
     }
 
     // Ignorar requisições para APIs externas
-    if (!event.request.url.startsWith(self.location.origin)) {
+    if (!requestUrl.startsWith(self.location.origin)) {
+        return;
+    }
+
+    // NÃO interceptar páginas de autenticação - deixar passar direto
+    // Isso garante que cookies de sessão sejam preservados corretamente
+    if (isAuthUrl(requestUrl)) {
         return;
     }
 
     event.respondWith(
-        fetch(event.request)
+        fetch(event.request, {
+            credentials: 'include', // Sempre incluir cookies de sessão
+            cache: 'no-store' // Não usar cache do navegador para garantir requisições frescas
+        })
             .then((response) => {
-                // Só cachear respostas válidas
+                // Não cachear respostas de autenticação
+                if (isAuthResponse(response)) {
+                    return response;
+                }
+
+                // Só cachear respostas válidas (200 OK) e do tipo basic
                 if (!response || response.status !== 200 || response.type !== 'basic') {
                     return response;
                 }
@@ -72,6 +124,10 @@ self.addEventListener('fetch', (event) => {
             })
             .catch(() => {
                 // Se a rede falhar, tentar buscar do cache
+                // Mas NUNCA retornar cache para páginas de autenticação
+                if (isAuthUrl(requestUrl)) {
+                    return fetch(event.request, { credentials: 'include' });
+                }
                 return caches.match(event.request);
             })
     );
