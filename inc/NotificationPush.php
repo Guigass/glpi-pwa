@@ -327,27 +327,35 @@ class PluginGlpipwaNotificationPush
      */
     public function notifyTicketUpdate(Ticket $ticket)
     {
+        $ticketId = $ticket->getID();
+        Toolbox::logDebug("GLPI PWA: notifyTicketUpdate chamado para ticket ID: {$ticketId}");
+        
         // Verificar se Firebase está configurado
         if (!$this->isFirebaseConfigured()) {
+            Toolbox::logWarning("GLPI PWA: Firebase não está configurado corretamente para ticket ID: {$ticketId}");
             return;
         }
 
         $recipients = $this->getTicketRecipients($ticket, false);
+        Toolbox::logDebug("GLPI PWA: Destinatários encontrados para atualização de ticket ID: {$ticketId} - Total: " . count($recipients));
         
         if (empty($recipients)) {
+            Toolbox::logDebug("GLPI PWA: Nenhum destinatário encontrado para atualização de ticket ID: {$ticketId}");
             return;
         }
 
-        $title = sprintf(__('Ticket #%d Updated', 'glpipwa'), $ticket->getID());
+        $title = sprintf(__('Ticket #%d Updated', 'glpipwa'), $ticketId);
         $body = __('The ticket has been updated', 'glpipwa');
 
         $data = [
             'url' => $ticket->getLinkURL(),
-            'ticket_id' => $ticket->getID(),
+            'ticket_id' => $ticketId,
             'type' => 'ticket_update',
         ];
 
+        Toolbox::logDebug("GLPI PWA: Enviando notificação de atualização para ticket ID: {$ticketId} - Título: {$title}");
         $this->sendToUsers($recipients, $title, $body, $data);
+        Toolbox::logDebug("GLPI PWA: Notificação de atualização processada para ticket ID: {$ticketId}");
     }
 
     /**

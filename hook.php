@@ -50,23 +50,55 @@ function plugin_glpipwa_load_hook_classes() {
  */
 function plugin_glpipwa_item_add($item) {
     try {
+        // Log de debug para confirmar que o hook está sendo chamado
+        if (class_exists('Toolbox')) {
+            Toolbox::logDebug("GLPI PWA: Hook item_add chamado - Item type: " . (is_object($item) ? get_class($item) : gettype($item)));
+        }
+        
         // Verificar se a classe Ticket existe antes de usar instanceof
         if (!class_exists('Ticket')) {
+            if (class_exists('Toolbox')) {
+                Toolbox::logDebug("GLPI PWA: Classe Ticket não encontrada no hook item_add");
+            }
             return;
         }
         
         if ($item instanceof Ticket) {
+            $ticketId = $item->getID();
+            if (class_exists('Toolbox')) {
+                Toolbox::logDebug("GLPI PWA: Processando novo ticket ID: {$ticketId}");
+            }
+            
             plugin_glpipwa_load_hook_classes();
             
             if (class_exists('PluginGlpipwaNotificationPush')) {
                 $notification = new PluginGlpipwaNotificationPush();
                 $notification->notifyNewTicket($item);
+                
+                if (class_exists('Toolbox')) {
+                    Toolbox::logDebug("GLPI PWA: Notificação de novo ticket enviada para ticket ID: {$ticketId}");
+                }
+            } else {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logWarning("GLPI PWA: Classe PluginGlpipwaNotificationPush não encontrada no hook item_add");
+                }
+            }
+        } else {
+            if (class_exists('Toolbox')) {
+                Toolbox::logDebug("GLPI PWA: Item não é instância de Ticket no hook item_add - Tipo: " . (is_object($item) ? get_class($item) : gettype($item)));
             }
         }
     } catch (Exception $e) {
-        // Silenciosamente ignora erros para não quebrar o fluxo do GLPI
+        // Log detalhado de erros para facilitar debug
         if (class_exists('Toolbox')) {
             Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_item_add - " . $e->getMessage());
+            Toolbox::logError("GLPI PWA: Stack trace: " . $e->getTraceAsString());
+        }
+    } catch (Throwable $e) {
+        // Capturar também erros fatais
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_item_add - " . $e->getMessage());
+            Toolbox::logError("GLPI PWA: Stack trace: " . $e->getTraceAsString());
         }
     }
 }
@@ -76,23 +108,55 @@ function plugin_glpipwa_item_add($item) {
  */
 function plugin_glpipwa_item_update($item) {
     try {
+        // Log de debug para confirmar que o hook está sendo chamado
+        if (class_exists('Toolbox')) {
+            Toolbox::logDebug("GLPI PWA: Hook item_update chamado - Item type: " . (is_object($item) ? get_class($item) : gettype($item)));
+        }
+        
         // Verificar se a classe Ticket existe antes de usar instanceof
         if (!class_exists('Ticket')) {
+            if (class_exists('Toolbox')) {
+                Toolbox::logDebug("GLPI PWA: Classe Ticket não encontrada no hook item_update");
+            }
             return;
         }
         
         if ($item instanceof Ticket) {
+            $ticketId = $item->getID();
+            if (class_exists('Toolbox')) {
+                Toolbox::logDebug("GLPI PWA: Processando atualização de ticket ID: {$ticketId}");
+            }
+            
             plugin_glpipwa_load_hook_classes();
             
             if (class_exists('PluginGlpipwaNotificationPush')) {
                 $notification = new PluginGlpipwaNotificationPush();
                 $notification->notifyTicketUpdate($item);
+                
+                if (class_exists('Toolbox')) {
+                    Toolbox::logDebug("GLPI PWA: Notificação de atualização enviada para ticket ID: {$ticketId}");
+                }
+            } else {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logWarning("GLPI PWA: Classe PluginGlpipwaNotificationPush não encontrada no hook item_update");
+                }
+            }
+        } else {
+            if (class_exists('Toolbox')) {
+                Toolbox::logDebug("GLPI PWA: Item não é instância de Ticket no hook item_update - Tipo: " . (is_object($item) ? get_class($item) : gettype($item)));
             }
         }
     } catch (Exception $e) {
-        // Silenciosamente ignora erros para não quebrar o fluxo do GLPI
+        // Log detalhado de erros para facilitar debug
         if (class_exists('Toolbox')) {
             Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_item_update - " . $e->getMessage());
+            Toolbox::logError("GLPI PWA: Stack trace: " . $e->getTraceAsString());
+        }
+    } catch (Throwable $e) {
+        // Capturar também erros fatais
+        if (class_exists('Toolbox')) {
+            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_item_update - " . $e->getMessage());
+            Toolbox::logError("GLPI PWA: Stack trace: " . $e->getTraceAsString());
         }
     }
 }
