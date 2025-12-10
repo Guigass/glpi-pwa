@@ -1,0 +1,128 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: pt_BR\n"
+
+msgid "GLPI PWA"
+msgstr "GLPI PWA"
+
+msgid "Configuração PWA"
+msgstr "Configuração PWA"
+
+msgid "Configuração Firebase"
+msgstr "Configuração Firebase"
+
+msgid "API Key"
+msgstr "Chave da API"
+
+msgid "Project ID"
+msgstr "ID do Projeto"
+
+msgid "Messaging Sender ID"
+msgstr "ID do Remetente de Mensagens"
+
+msgid "App ID"
+msgstr "ID do Aplicativo"
+
+msgid "VAPID Key"
+msgstr "Chave VAPID"
+
+msgid "Server Key"
+msgstr "Chave do Servidor"
+
+msgid "Nome da Aplicação"
+msgstr "Nome da Aplicação"
+
+msgid "Nome Curto"
+msgstr "Nome Curto"
+
+msgid "Cor do Tema"
+msgstr "Cor do Tema"
+
+msgid "Cor de Fundo"
+msgstr "Cor de Fundo"
+
+msgid "URL Inicial"
+msgstr "URL Inicial"
+
+msgid "Modo de Exibição"
+msgstr "Modo de Exibição"
+
+msgid "Orientação"
+msgstr "Orientação"
+
+msgid "Ícones"
+msgstr "Ícones"
+
+msgid "Ícone 192x192"
+msgstr "Ícone 192x192"
+
+msgid "Ícone 512x512"
+msgstr "Ícone 512x512"
+
+msgid "Salvar"
+msgstr "Salvar"
+
+msgid "Enviar Notificação de Teste"
+msgstr "Enviar Notificação de Teste"
+
+msgid "Standalone"
+msgstr "Standalone"
+
+msgid "Fullscreen"
+msgstr "Tela Cheia"
+
+msgid "Minimal UI"
+msgstr "UI Mínima"
+
+msgid "Browser"
+msgstr "Navegador"
+
+msgid "Qualquer"
+msgstr "Qualquer"
+
+msgid "Retrato"
+msgstr "Retrato"
+
+msgid "Paisagem"
+msgstr "Paisagem"
+
+msgid "Configurações salvas com sucesso"
+msgstr "Configurações salvas com sucesso"
+
+msgid "Erro ao validar configurações"
+msgstr "Erro ao validar configurações"
+
+msgid "Token de segurança inválido"
+msgstr "Token de segurança inválido"
+
+msgid "Notificação de Teste"
+msgstr "Notificação de Teste"
+
+msgid "Esta é uma notificação de teste do plugin PWA"
+msgstr "Esta é uma notificação de teste do plugin PWA"
+
+msgid "Notificação de teste enviada"
+msgstr "Notificação de teste enviada"
+
+msgid "Erro ao enviar notificação de teste"
+msgstr "Erro ao enviar notificação de teste"
+
+msgid "Novo Chamado #%d"
+msgstr "Novo Chamado #%d"
+
+msgid "Chamado aberto por %s - Urgência: %s"
+msgstr "Chamado aberto por %s - Urgência: %s"
+
+msgid "Atualização no Chamado #%d"
+msgstr "Atualização no Chamado #%d"
+
+msgid "O chamado foi atualizado"
+msgstr "O chamado foi atualizado"
+
+msgid "Nova interação no Chamado #%d"
+msgstr "Nova interação no Chamado #%d"
+
+msgid "%s comentou: %s"
+msgstr "%s comentou: %s"
+

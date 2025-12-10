@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<glpiplugin>
+    <name>GLPI PWA</name>
+    <version>1.0.0</version>
+    <author>GLPI Community</author>
+    <license>GPL-2.0-or-later</license>
+    <homepage>https://github.com/glpi-project/glpi-pwa</homepage>
+    <requirements>
+        <glpi>
+            <min>11.0</min>
+            <max>11.99</max>
+        </glpi>
+        <php>
+            <min>8.2</min>
+        </php>
+    </requirements>
+    <description>
+        Plugin para transformar o GLPI em uma Progressive Web App (PWA) com suporte a notificações push via Firebase Cloud Messaging.
+    </description>
+</glpiplugin>
+

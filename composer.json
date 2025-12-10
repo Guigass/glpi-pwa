@@ -1,0 +1,24 @@
+{
+    "name": "glpi-project/glpipwa",
+    "description": "Plugin GLPI para transformar o GLPI em uma Progressive Web App (PWA) com suporte a notificações push via Firebase Cloud Messaging",
+    "type": "glpi-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "GLPI Community",
+            "homepage": "https://github.com/glpi-project/glpi-pwa"
+        }
+    ],
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "glpi-project/coding-standard": "^1.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}
+
