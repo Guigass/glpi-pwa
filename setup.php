@@ -209,13 +209,3 @@ function plugin_glpipwa_check_config($verbose = false) {
     return true;
 }
 
-// Incluir hook.php onde estão as funções de instalação e desinstalação
-// Conforme a documentação oficial do GLPI (https://glpi-developer-documentation.readthedocs.io/en/master/plugins/tutorial.html),
-// é uma prática recomendada incluir o hook.php no setup.php para garantir que as funções
-// de instalação e desinstalação sejam carregadas corretamente durante o processo de instalação.
-// O GLPI carrega setup.php primeiro, então precisamos incluir hook.php aqui para que
-// as funções plugin_glpipwa_install() e plugin_glpipwa_uninstall() estejam disponíveis.
-if (file_exists(__DIR__ . '/hook.php')) {
-    require_once(__DIR__ . '/hook.php');
-}
-
