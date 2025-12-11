@@ -352,17 +352,6 @@
         // IMPORTANTE: Deve aguardar o Service Worker estar activated
         // OTIMIZAÇÃO: Verifica token armazenado antes de solicitar novo ao Firebase
         function getFCMToken(forceRefresh = false) {
-            // Verificar se já temos um token válido armazenado
-            if (!forceRefresh) {
-                const storedToken = getStoredFCMToken();
-                if (storedToken && isStoredTokenValid()) {
-                    // Token válido encontrado, verificar se ainda é o mesmo no Firebase
-                    // Mas não vamos chamar getToken() apenas para verificar - isso seria contraproducente
-                    // Em vez disso, vamos usar o token armazenado e só atualizar se necessário
-                    return Promise.resolve(storedToken);
-                }
-            }
-
             // Função auxiliar para processar token obtido do Firebase
             const processToken = (currentToken) => {
                 if (currentToken) {
@@ -381,21 +370,8 @@
                 }
             };
 
-            // Verificar se temos Service Worker registration
-            if (!swRegistration) {
-                const tokenOptions = {
-                    vapidKey: vapidKey
-                };
-                return messaging.getToken(tokenOptions)
-                    .then(processToken)
-                    .catch((error) => {
-                        console.error('[GLPI PWA] Erro ao obter token FCM:', error);
-                        return null;
-                    });
-            }
-
-            // Aguardar Service Worker estar ativo
-            return waitForServiceWorkerActive(swRegistration).then((activeRegistration) => {
+            // Função auxiliar para obter token do Firebase (após SW estar pronto)
+            const fetchTokenFromFirebase = (activeRegistration) => {
                 // Verificar se o pushManager está disponível
                 if (!activeRegistration || !activeRegistration.pushManager) {
                     // Tentar sem serviceWorkerRegistration
@@ -431,19 +407,70 @@
                                 return null;
                             });
                     });
-            }).catch((error) => {
-                console.error('[GLPI PWA] Erro ao aguardar Service Worker ativo:', error);
-                // Tentar obter token mesmo sem Service Worker (pode funcionar em alguns casos)
+            };
+
+            // Verificar se já temos um token válido armazenado (e não forçamos refresh)
+            if (!forceRefresh) {
+                const storedToken = getStoredFCMToken();
+                if (storedToken && isStoredTokenValid()) {
+                    // Token válido encontrado
+                    // IMPORTANTE: Mesmo com token armazenado, precisamos aguardar o SW estar pronto
+                    // para evitar erros do Firebase ao tentar acessar pushManager
+                    if (!swRegistration) {
+                        // Sem SW, podemos retornar o token armazenado diretamente
+                        return Promise.resolve(storedToken);
+                    }
+
+                    // Com SW, aguardar estar pronto antes de retornar
+                    // Isso evita erros do Firebase ao tentar acessar pushManager de undefined
+                    return waitForServiceWorkerActive(swRegistration)
+                        .then(() => {
+                            // SW está pronto, retornar token armazenado
+                            return storedToken;
+                        })
+                        .catch((error) => {
+                            // Se houver erro ao aguardar SW, tentar obter token do Firebase
+                            console.warn('[GLPI PWA] Erro ao aguardar SW, tentando obter token do Firebase:', error);
+                            const tokenOptions = {
+                                vapidKey: vapidKey
+                            };
+                            return messaging.getToken(tokenOptions)
+                                .then(processToken)
+                                .catch(() => storedToken); // Se falhar, retornar token armazenado
+                        });
+                }
+            }
+
+            // Não temos token válido ou forçamos refresh - obter do Firebase
+            // Verificar se temos Service Worker registration
+            if (!swRegistration) {
                 const tokenOptions = {
                     vapidKey: vapidKey
                 };
                 return messaging.getToken(tokenOptions)
                     .then(processToken)
                     .catch((error) => {
-                        console.error('[GLPI PWA] Erro ao obter token:', error);
+                        console.error('[GLPI PWA] Erro ao obter token FCM:', error);
                         return null;
                     });
-            });
+            }
+
+            // Aguardar Service Worker estar ativo antes de obter token
+            return waitForServiceWorkerActive(swRegistration)
+                .then(fetchTokenFromFirebase)
+                .catch((error) => {
+                    console.error('[GLPI PWA] Erro ao aguardar Service Worker ativo:', error);
+                    // Tentar obter token mesmo sem Service Worker (pode funcionar em alguns casos)
+                    const tokenOptions = {
+                        vapidKey: vapidKey
+                    };
+                    return messaging.getToken(tokenOptions)
+                        .then(processToken)
+                        .catch((error) => {
+                            console.error('[GLPI PWA] Erro ao obter token:', error);
+                            return null;
+                        });
+                });
         }
 
         // Função auxiliar para normalizar requestPermission conforme MDN
