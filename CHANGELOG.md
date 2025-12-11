@@ -5,11 +5,17 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
-## [1.0.1] - 2025-01-XX
+## [1.0.2] - 2025-12-11
 
 ### Corrigido
 
-- (A ser preenchido com as correções da versão)
+- Correção de bug no armazenamento do token no servidor
+
+## [1.0.1] - 2025-12-11
+
+### Corrigido
+
+- Arruma o script do FCM que pega o token do localstorage
 
 ## [1.0.0] - 2025-12-11
 
