@@ -617,19 +617,12 @@
      * Primeiro obtém um token CSRF fresco via GET, depois usa esse token na requisição POST.
      * Isso evita consumir o token CSRF da página, que causaria problemas em outras ações.
      * 
-     * OTIMIZAÇÃO: Compara com token armazenado antes de registrar no servidor.
+     * NOTA: A verificação se o token precisa ser registrado é feita ANTES de chamar esta função,
+     * em processToken() ou no fluxo de token armazenado. Esta função sempre tenta registrar.
      */
     function registerToken(token) {
         if (!token || typeof token !== 'string' || token.length === 0) {
             console.error('[GLPI PWA] Token inválido para registro');
-            return;
-        }
-
-        // Verificar se o token é diferente do armazenado antes de registrar
-        const storedToken = getStoredFCMToken();
-        if (storedToken === token) {
-            // Token já está registrado no servidor (assumindo que foi registrado quando armazenado)
-            // Não precisa registrar novamente
             return;
         }
 
