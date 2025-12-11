@@ -30,7 +30,7 @@
  * ---------------------------------------------------------------------
  */
 
-define('PLUGIN_GLPIPWA_VERSION', '1.0.3');
+define('PLUGIN_GLPIPWA_VERSION', '1.0.4');
 
 /**
  * Carrega as classes do plugin quando necessário
@@ -146,7 +146,7 @@ function plugin_version_glpipwa() {
     // Retornar array simples sem try/catch para evitar qualquer problema
     return [
         'name'           => 'GLPI PWA',
-        'version'        => defined('PLUGIN_GLPIPWA_VERSION') ? PLUGIN_GLPIPWA_VERSION : '1.0.3',
+        'version'        => defined('PLUGIN_GLPIPWA_VERSION') ? PLUGIN_GLPIPWA_VERSION : '1.0.4',
         'author'         => 'GLPI Community',
         'license'        => 'GPLv2+',
         'homepage'       => 'https://github.com/glpi-project/glpi-pwa',
