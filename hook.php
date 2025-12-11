@@ -34,11 +34,6 @@ if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
 }
 
-// Garantir que a versão esteja definida (caso hook.php seja carregado antes de setup.php)
-if (!defined('PLUGIN_GLPIPWA_VERSION')) {
-    define('PLUGIN_GLPIPWA_VERSION', '1.0.0');
-}
-
 /**
  * Carrega as classes necessárias do plugin
  */
@@ -647,11 +642,6 @@ function plugin_glpipwa_install() {
     global $DB;
 
     try {
-        // Garantir que a versão esteja definida
-        if (!defined('PLUGIN_GLPIPWA_VERSION')) {
-            define('PLUGIN_GLPIPWA_VERSION', '1.0.0');
-        }
-        
         // Verificar se as classes necessárias existem
         if (!class_exists('Migration')) {
             return false;
@@ -745,11 +735,6 @@ function plugin_glpipwa_uninstall() {
     global $DB;
 
     try {
-        // Garantir que a versão esteja definida
-        if (!defined('PLUGIN_GLPIPWA_VERSION')) {
-            define('PLUGIN_GLPIPWA_VERSION', '1.0.0');
-        }
-        
         // Verificar se as classes necessárias existem
         if (!class_exists('Migration')) {
             return false;
