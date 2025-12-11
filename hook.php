@@ -36,7 +36,7 @@ if (!defined('GLPI_ROOT')) {
 
 // Definir versão do plugin se ainda não estiver definida
 if (!defined('PLUGIN_GLPIPWA_VERSION')) {
-    define('PLUGIN_GLPIPWA_VERSION', '1.0.4');
+    define('PLUGIN_GLPIPWA_VERSION', '1.0.5');
 }
 
 /**
