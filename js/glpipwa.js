@@ -355,11 +355,15 @@
             // Função auxiliar para processar token obtido do Firebase
             const processToken = (currentToken) => {
                 if (currentToken) {
+                    // IMPORTANTE: Verificar token armazenado ANTES de armazenar o novo
+                    const storedToken = getStoredFCMToken();
+                    const needsRegistration = currentToken !== storedToken;
+
                     // Armazenar token no localStorage
                     storeFCMToken(currentToken);
+
                     // Registrar no servidor apenas se for diferente do armazenado
-                    const storedToken = getStoredFCMToken();
-                    if (currentToken !== storedToken) {
+                    if (needsRegistration) {
                         registerToken(currentToken);
                     }
                     return currentToken;
