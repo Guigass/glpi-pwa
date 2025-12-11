@@ -33,10 +33,34 @@
 if (!defined('GLPI_ROOT')) {
     define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
 }
-include(GLPI_ROOT . '/inc/includes.php');
 
-// Carregar classes do plugin
-plugin_glpipwa_load_classes();
+// Carregar MinimalLoader ao invés de includes.php para evitar interferência com sessão/CSRF
+$minimalLoaderFile = __DIR__ . '/../inc/MinimalLoader.php';
+if (!file_exists($minimalLoaderFile)) {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'MinimalLoader not found']);
+    exit;
+}
+
+try {
+    require_once($minimalLoaderFile);
+    
+    // Carregar usando MinimalLoader (sem sessão)
+    if (!class_exists('PluginGlpipwaMinimalLoader') || !PluginGlpipwaMinimalLoader::load()) {
+        throw new Exception('Failed to load MinimalLoader');
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Error loading MinimalLoader: ' . $e->getMessage()]);
+    exit;
+} catch (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Fatal error loading MinimalLoader: ' . $e->getMessage()]);
+    exit;
+}
 
 // Verificar se as classes necessárias estão disponíveis
 if (!class_exists('PluginGlpipwaManifest') || !class_exists('PluginGlpipwaConfig')) {

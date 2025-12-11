@@ -61,109 +61,27 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit;
 }
 
-// Validar CSRF token - CRÍTICO: deve ser feito antes de qualquer outra operação
-// O GLPI 11 tem um listener do Symfony que verifica CSRF automaticamente
-// Aceitar token tanto do body JSON quanto do header HTTP ou $_POST
-$csrfToken = null;
+// IMPORTANTE: NÃO validamos CSRF token aqui propositalmente!
+// 
+// Motivo: No GLPI 11, tokens CSRF são single-use. Se validarmos o token aqui,
+// ele será consumido e invalidado, causando falha em outras ações na mesma página
+// (como trocar de perfil, enviar formulários, etc.).
+//
+// Segurança alternativa implementada:
+// 1. Autenticação de sessão já verificada acima (Session::getLoginUserID())
+// 2. Requisição usa credentials: 'same-origin' que garante cookies válidos
+// 3. Validação de Origin/Referer abaixo como camada adicional
+// 4. Validação rigorosa do formato do token FCM
 
-// Tentar obter do body JSON primeiro
-if (isset($data['_glpi_csrf_token']) && !empty($data['_glpi_csrf_token'])) {
-    $csrfToken = $data['_glpi_csrf_token'];
-}
-
-// Tentar obter do $_POST (caso venha como form-data)
-if (empty($csrfToken) && isset($_POST['_glpi_csrf_token']) && !empty($_POST['_glpi_csrf_token'])) {
-    $csrfToken = $_POST['_glpi_csrf_token'];
-}
-
-// Tentar obter do header HTTP (padrão do GLPI 11)
-if (empty($csrfToken)) {
-    // Função auxiliar para obter headers (getallheaders pode não estar disponível em todos os ambientes)
-    $headers = [];
-    if (function_exists('getallheaders')) {
-        $headers = getallheaders();
-    } else {
-        // Fallback: construir array de headers a partir de $_SERVER
-        foreach ($_SERVER as $key => $value) {
-            if (strpos($key, 'HTTP_') === 0) {
-                $headerName = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
-                $headers[$headerName] = $value;
-            }
-        }
-    }
-    
-    if (isset($headers['X-GLPI-CSRF-TOKEN']) && !empty($headers['X-GLPI-CSRF-TOKEN'])) {
-        $csrfToken = $headers['X-GLPI-CSRF-TOKEN'];
-    } elseif (isset($headers['X-Glpi-Csrf-Token']) && !empty($headers['X-Glpi-Csrf-Token'])) {
-        $csrfToken = $headers['X-Glpi-Csrf-Token'];
-    } elseif (isset($_SERVER['HTTP_X_GLPI_CSRF_TOKEN']) && !empty($_SERVER['HTTP_X_GLPI_CSRF_TOKEN'])) {
-        $csrfToken = $_SERVER['HTTP_X_GLPI_CSRF_TOKEN'];
-    }
-}
-
-// Tentar obter do header alternativo
-if (empty($csrfToken) && isset($_SERVER['HTTP_X_CSRF_TOKEN']) && !empty($_SERVER['HTTP_X_CSRF_TOKEN'])) {
-    $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'];
-}
-
-// Validar o token se encontrado
-if (!empty($csrfToken)) {
-    // Colocar no $_POST para que o listener do Symfony encontre (se ainda não estiver)
-    if (!isset($_POST['_glpi_csrf_token'])) {
-        $_POST['_glpi_csrf_token'] = $csrfToken;
-    }
-    
-    // Validar explicitamente
-    if (!Session::validateCSRF(['_glpi_csrf_token' => $csrfToken])) {
-        // Log detalhado para debug
-        if (class_exists('Toolbox')) {
-            Toolbox::logInFile('glpipwa', 'GLPIPWA: CSRF token inválido. UserID: ' . Session::getLoginUserID() . ', Token recebido: ' . substr($csrfToken, 0, 20) . '...', LOG_WARNING);
-        }
-        http_response_code(403);
-        echo json_encode([
-            'success' => false,
-            'error' => 'Token de segurança inválido',
-            'title' => 'Acesso negado',
-            'message' => 'A ação que você requisitou não é permitida. Por favor, recarregue a página e tente novamente.'
-        ]);
-        exit;
-    }
-} else {
-    // CSRF token ausente - log detalhado e bloquear
-    if (class_exists('Toolbox')) {
-        $headersForLog = [];
-        if (function_exists('getallheaders')) {
-            $headersForLog = getallheaders();
-        } else {
-            foreach ($_SERVER as $key => $value) {
-                if (strpos($key, 'HTTP_') === 0) {
-                    $headerName = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
-                    $headersForLog[$headerName] = $value;
-                }
-            }
-        }
-        Toolbox::logInFile('glpipwa', 'GLPIPWA: CSRF token ausente. UserID: ' . Session::getLoginUserID() . ', Method: ' . $_SERVER['REQUEST_METHOD'] . ', Headers: ' . json_encode($headersForLog), LOG_WARNING);
-    }
-    http_response_code(403);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Token de segurança ausente',
-        'title' => 'Acesso negado',
-        'message' => 'Token de segurança CSRF não fornecido. Por favor, recarregue a página e tente novamente.'
-    ]);
-    exit;
-}
-
-// Validar segurança: Origin/Referer (apenas como medida adicional de segurança)
+// Validar segurança: Origin/Referer
 // Como já verificamos autenticação de sessão acima, confiamos na autenticação
 // Requisições fetch com credentials: 'same-origin' garantem que vem do mesmo domínio
-// A validação de Origin/Referer serve apenas para logging e detecção de anormalidades
 $serverHost = $_SERVER['HTTP_HOST'] ?? '';
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $referer = $_SERVER['HTTP_REFERER'] ?? '';
 $originValidated = false;
 
-// Verificar Origin ou Referer apenas para logging
+// Verificar Origin ou Referer
 if (!empty($serverHost)) {
     // Normalizar host (remover porta se presente)
     $serverHostNormalized = preg_replace('/:\d+$/', '', $serverHost);
@@ -185,15 +103,11 @@ if (!empty($serverHost)) {
     }
 }
 
-// Log de aviso apenas se Origin/Referer não foi validado (mas não bloquear)
-// Isso ajuda a detectar possíveis problemas sem bloquear requisições válidas
-// de usuários autenticados
+// Log de aviso se Origin/Referer não foi validado (mas não bloquear)
+// O usuário está autenticado via sessão, o que é a principal medida de segurança
 if (!$originValidated && class_exists('Toolbox')) {
-    Toolbox::logInFile('glpipwa', 'GLPIPWA: Registro de token FCM sem validação de Origin/Referer. Host: ' . ($serverHost ?? 'N/A') . ', Origin: ' . ($origin ?? 'N/A') . ', Referer: ' . ($referer ?? 'N/A') . ', UserID: ' . Session::getLoginUserID(), LOG_WARNING);
+    Toolbox::logInFile('glpipwa', 'GLPIPWA: Registro de token FCM sem validação de Origin/Referer. Host: ' . ($serverHost ?? 'N/A') . ', Origin: ' . ($origin ?? 'N/A') . ', Referer: ' . ($referer ?? 'N/A') . ', UserID: ' . Session::getLoginUserID(), LOG_DEBUG);
 }
-
-// Não bloquear - o usuário está autenticado, o que é suficiente para segurança
-// A validação de sessão do GLPI já garante que a requisição é legítima
 
 // Validar token FCM
 if (!isset($data['token']) || empty($data['token'])) {

@@ -46,30 +46,35 @@ if (!defined('GLPI_ROOT')) {
     define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
 }
 
-// Tentar incluir GLPI
-$glpiIncludes = GLPI_ROOT . '/inc/includes.php';
-if (!file_exists($glpiIncludes)) {
-    // Se não encontrar, tentar método alternativo
+// Carregar MinimalLoader ao invés de includes.php para evitar interferência com sessão/CSRF
+$minimalLoaderFile = __DIR__ . '/../inc/MinimalLoader.php';
+if (!file_exists($minimalLoaderFile)) {
+    // Se não encontrar MinimalLoader, tentar método alternativo
     http_response_code(200);
     header('Content-Type: application/javascript; charset=utf-8');
     header('Service-Worker-Allowed: /');
     header('Cache-Control: no-cache, no-store, must-revalidate');
     ob_end_clean();
-    echo "// Service Worker - GLPI não encontrado\n";
+    echo "// Service Worker - MinimalLoader não encontrado\n";
     echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
     echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
     exit;
 }
 
 try {
-    include($glpiIncludes);
+    require_once($minimalLoaderFile);
+    
+    // Carregar usando MinimalLoader (sem sessão)
+    if (!class_exists('PluginGlpipwaMinimalLoader') || !PluginGlpipwaMinimalLoader::load()) {
+        throw new Exception('Falha ao carregar MinimalLoader');
+    }
 } catch (Exception $e) {
     http_response_code(200);
     header('Content-Type: application/javascript; charset=utf-8');
     header('Service-Worker-Allowed: /');
     header('Cache-Control: no-cache, no-store, must-revalidate');
     ob_end_clean();
-    echo "// Service Worker - Erro ao carregar GLPI\n";
+    echo "// Service Worker - Erro ao carregar MinimalLoader\n";
     echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
     echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
     exit;
@@ -79,34 +84,10 @@ try {
     header('Service-Worker-Allowed: /');
     header('Cache-Control: no-cache, no-store, must-revalidate');
     ob_end_clean();
-    echo "// Service Worker - Erro fatal ao carregar GLPI\n";
+    echo "// Service Worker - Erro fatal ao carregar MinimalLoader\n";
     echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
     echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
     exit;
-}
-
-// Carregar classes do plugin de forma segura
-if (!function_exists('plugin_glpipwa_load_classes')) {
-    $setupFile = __DIR__ . '/../setup.php';
-    if (file_exists($setupFile)) {
-        try {
-            require_once($setupFile);
-        } catch (Exception $e) {
-            // Ignorar erro silenciosamente
-        } catch (Throwable $e) {
-            // Ignorar erro fatal silenciosamente
-        }
-    }
-}
-
-if (function_exists('plugin_glpipwa_load_classes')) {
-    try {
-        plugin_glpipwa_load_classes();
-    } catch (Exception $e) {
-        // Ignorar erro silenciosamente
-    } catch (Throwable $e) {
-        // Ignorar erro fatal silenciosamente
-    }
 }
 
 // Obter configuração Firebase para injetar no SW

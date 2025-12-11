@@ -33,10 +33,34 @@
 if (!defined('GLPI_ROOT')) {
     define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
 }
-include(GLPI_ROOT . '/inc/includes.php');
 
-// Carregar classes do plugin
-plugin_glpipwa_load_classes();
+// Carregar MinimalLoader ao invés de includes.php para evitar interferência com sessão/CSRF
+$minimalLoaderFile = __DIR__ . '/../inc/MinimalLoader.php';
+if (!file_exists($minimalLoaderFile)) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo '// MinimalLoader not found';
+    exit;
+}
+
+try {
+    require_once($minimalLoaderFile);
+    
+    // Carregar usando MinimalLoader (sem sessão)
+    if (!class_exists('PluginGlpipwaMinimalLoader') || !PluginGlpipwaMinimalLoader::load()) {
+        throw new Exception('Failed to load MinimalLoader');
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo '// Error loading MinimalLoader';
+    exit;
+} catch (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo '// Fatal error loading MinimalLoader';
+    exit;
+}
 
 // Obter tamanho do ícone (192 ou 512)
 $size = isset($_GET['size']) ? (int)$_GET['size'] : 192;

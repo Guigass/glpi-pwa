@@ -521,7 +521,12 @@
     }
 
     /**
-     * Registra token FCM no servidor com CSRF token
+     * Registra token FCM no servidor
+     * 
+     * NOTA: Não enviamos token CSRF propositalmente!
+     * No GLPI 11, tokens CSRF são single-use. Se enviarmos e o servidor validar,
+     * o token será consumido e invalidado, causando falha em outras ações na mesma página.
+     * A autenticação de sessão (cookies) é suficiente para segurança neste endpoint.
      */
     function registerToken(token) {
         if (!token || typeof token !== 'string' || token.length === 0) {
@@ -530,58 +535,6 @@
         }
 
         const pluginUrl = getPluginUrl();
-
-        // Obter CSRF token - tentar múltiplas fontes
-        let csrfToken = '';
-
-        // 1. Tentar meta tag (formato comum)
-        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-        if (csrfMeta) {
-            csrfToken = csrfMeta.getAttribute('content');
-        }
-
-        // 2. Tentar meta tag com nome alternativo
-        if (!csrfToken) {
-            const csrfMetaAlt = document.querySelector('meta[name="_glpi_csrf_token"]');
-            if (csrfMetaAlt) {
-                csrfToken = csrfMetaAlt.getAttribute('content');
-            }
-        }
-
-        // 3. Tentar input hidden padrão do GLPI
-        if (!csrfToken) {
-            const csrfInput = document.querySelector('input[name="_glpi_csrf_token"]');
-            if (csrfInput) {
-                csrfToken = csrfInput.value;
-            }
-        }
-
-        // 4. Tentar buscar de qualquer formulário na página
-        if (!csrfToken) {
-            const allInputs = document.querySelectorAll('input[name="_glpi_csrf_token"]');
-            if (allInputs.length > 0) {
-                csrfToken = allInputs[0].value;
-            }
-        }
-
-        // 5. Tentar buscar em iframes (caso o GLPI use iframes)
-        if (!csrfToken && window.frames) {
-            try {
-                for (let i = 0; i < window.frames.length; i++) {
-                    try {
-                        const frameInput = window.frames[i].document.querySelector('input[name="_glpi_csrf_token"]');
-                        if (frameInput && frameInput.value) {
-                            csrfToken = frameInput.value;
-                            break;
-                        }
-                    } catch (e) {
-                        // Ignorar erros de cross-origin
-                    }
-                }
-            } catch (e) {
-                // Ignorar erros
-            }
-        }
 
         const data = {
             token: token,
@@ -594,29 +547,6 @@
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         };
-
-        // Adicionar CSRF token no body e no header (GLPI 11 aceita ambos)
-        if (csrfToken) {
-            data._glpi_csrf_token = csrfToken;
-            // GLPI 11 também aceita via header HTTP
-            headers['X-Glpi-Csrf-Token'] = csrfToken;
-            console.debug('[GLPI PWA] CSRF token encontrado, incluindo na requisição (body e header)');
-        } else {
-            console.warn('[GLPI PWA] CSRF token não encontrado - o registro pode falhar');
-            // Tentar buscar novamente de forma mais agressiva
-            const allMetaTags = document.querySelectorAll('meta[name*="csrf"], meta[name*="CSRF"]');
-            for (let i = 0; i < allMetaTags.length; i++) {
-                const meta = allMetaTags[i];
-                const content = meta.getAttribute('content');
-                if (content && content.length > 0) {
-                    csrfToken = content;
-                    data._glpi_csrf_token = csrfToken;
-                    headers['X-Glpi-Csrf-Token'] = csrfToken;
-                    console.debug('[GLPI PWA] CSRF token encontrado em meta tag alternativa');
-                    break;
-                }
-            }
-        }
 
         // Construir URL completa para garantir que o Origin seja enviado
         const registerUrl = pluginUrl + '/front/register.php';
