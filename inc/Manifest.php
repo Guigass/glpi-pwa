@@ -141,7 +141,7 @@ class PluginGlpipwaManifest
                 'src' => $maskable_path,
                 'sizes' => '512x512',
                 'type' => 'image/png',
-                'purpose' => 'maskable',
+                'purpose' => 'any maskable',
             ];
         }
 
