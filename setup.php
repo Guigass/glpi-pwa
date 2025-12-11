@@ -101,14 +101,10 @@ function plugin_init_glpipwa() {
     plugin_glpipwa_load_classes();
 
     // Registrar domínio de tradução do plugin
-    // O GLPI carrega automaticamente traduções de plugins, mas precisamos garantir
-    // que o domínio esteja registrado corretamente
-    if (function_exists('bindtextdomain')) {
-        $localeDir = __DIR__ . '/locale';
-        if (is_dir($localeDir)) {
-            bindtextdomain('glpipwa', $localeDir);
-            bind_textdomain_codeset('glpipwa', 'UTF-8');
-        }
+    // O GLPI carrega traduções de plugins usando Plugin::loadTranslation()
+    // O textdomain deve ser exatamente igual ao nome da pasta do plugin
+    if (class_exists('Plugin')) {
+        Plugin::loadTranslation('glpipwa');
     }
 
     // Registrar hooks básicos - sempre

@@ -1,0 +1,214 @@
+# GLPI PWA Plugin - Portuguese (Brazil) Translation
+# Copyright (C) 2024 GLPI Community
+# This file is distributed under the same license as the GLPI PWA plugin.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: GLPI PWA 1.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: Portuguese (Brazil) <pt_BR@li.org>\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: setup.php
+msgid "GLPI PWA"
+msgstr ""
+
+#: front/config.form.php
+msgid "PWA Configuration"
+msgstr ""
+
+#: front/config.form.php
+msgid "Firebase Configuration"
+msgstr ""
+
+#: front/config.form.php
+msgid "API Key"
+msgstr ""
+
+#: front/config.form.php
+msgid "Project ID"
+msgstr ""
+
+#: front/config.form.php
+msgid "Messaging Sender ID"
+msgstr ""
+
+#: front/config.form.php
+msgid "App ID"
+msgstr ""
+
+#: front/config.form.php
+msgid "VAPID Key"
+msgstr ""
+
+#: front/config.form.php
+msgid "Firebase Service Account (FCM v1)"
+msgstr ""
+
+#: front/config.form.php
+msgid "Service Account JSON File"
+msgstr ""
+
+#: front/config.form.php
+msgid "Upload the service account JSON file from Firebase Console"
+msgstr ""
+
+#: front/config.form.php
+msgid "Invalid Service Account JSON: invalid email"
+msgstr ""
+
+#: front/config.form.php
+msgid "Invalid Service Account JSON format"
+msgstr ""
+
+#: front/config.form.php
+msgid "Invalid Service Account email format"
+msgstr ""
+
+#: front/config.form.php
+msgid "Application Name"
+msgstr ""
+
+#: front/config.form.php
+msgid "Short Name"
+msgstr ""
+
+#: front/config.form.php
+msgid "Theme Color"
+msgstr ""
+
+#: front/config.form.php
+msgid "Background Color"
+msgstr ""
+
+#: front/config.form.php
+msgid "Start URL"
+msgstr ""
+
+#: front/config.form.php
+msgid "Display Mode"
+msgstr ""
+
+#: front/config.form.php
+msgid "Orientation"
+msgstr ""
+
+#: front/config.form.php
+msgid "Icons"
+msgstr ""
+
+#: front/config.form.php
+msgid "Icon 192x192"
+msgstr ""
+
+#: front/config.form.php
+msgid "Icon 512x512"
+msgstr ""
+
+#: front/config.form.php
+msgid "Save"
+msgstr ""
+
+#: front/config.form.php
+msgid "Send Test Notification"
+msgstr ""
+
+#: front/config.form.php
+msgid "Standalone"
+msgstr ""
+
+#: front/config.form.php
+msgid "Fullscreen"
+msgstr ""
+
+#: front/config.form.php
+msgid "Minimal UI"
+msgstr ""
+
+#: front/config.form.php
+msgid "Browser"
+msgstr ""
+
+#: front/config.form.php
+msgid "Any"
+msgstr ""
+
+#: front/config.form.php
+msgid "Portrait"
+msgstr ""
+
+#: front/config.form.php
+msgid "Landscape"
+msgstr ""
+
+#: front/config.form.php
+msgid "Settings saved successfully"
+msgstr ""
+
+#: front/config.form.php
+msgid "Error validating settings"
+msgstr ""
+
+#: front/config.form.php
+msgid "Invalid security token"
+msgstr ""
+
+#: front/config.form.php
+msgid "Test Notification"
+msgstr ""
+
+#: front/config.form.php
+msgid "This is a test notification from the PWA plugin"
+msgstr ""
+
+#: front/config.form.php
+msgid "Test notification sent"
+msgstr ""
+
+#: front/config.form.php
+msgid "Error sending test notification"
+msgstr ""
+
+#: inc/NotificationPush.php
+msgid "New Ticket #%d"
+msgstr ""
+
+#: inc/NotificationPush.php
+msgid "Ticket opened by %s - Urgency: %s"
+msgstr ""
+
+#: inc/NotificationPush.php
+msgid "Ticket #%d Updated"
+msgstr ""
+
+#: inc/NotificationPush.php
+msgid "The ticket has been updated"
+msgstr ""
+
+#: inc/NotificationPush.php
+msgid "New interaction on Ticket #%d"
+msgstr ""
+
+#: inc/NotificationPush.php
+msgid "%s commented: %s"
+msgstr ""
+
+#: inc/NotificationPush.php
+msgid "User"
+msgstr ""
+
+#: inc/Cron.php
+msgid "GLPI PWA Token Cleanup"
+msgstr ""
+
+#: inc/Cron.php
+msgid "Clean expired FCM tokens"
+msgstr ""
+
