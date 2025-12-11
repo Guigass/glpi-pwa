@@ -162,6 +162,30 @@ msgstr "Default Shortcuts"
 msgid "Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)"
 msgstr "Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)"
 
+#: inc/Manifest.php
+msgid "Open Ticket"
+msgstr "Open Ticket"
+
+#: inc/Manifest.php
+msgid "New Ticket"
+msgstr "New Ticket"
+
+#: inc/Manifest.php
+msgid "My Tickets"
+msgstr "My Tickets"
+
+#: inc/Manifest.php
+msgid "Tickets"
+msgstr "Tickets"
+
+#: inc/Manifest.php
+msgid "Knowledge Base"
+msgstr "Knowledge Base"
+
+#: inc/Manifest.php
+msgid "KB"
+msgstr "KB"
+
 msgid "Custom Shortcuts"
 msgstr "Custom Shortcuts"
 
@@ -267,6 +291,90 @@ msgstr "%s commented: %s"
 msgid "User"
 msgstr "User"
 
+#: inc/NotificationService.php
+msgid "New ticket opened"
+msgstr "New ticket opened"
+
+#: inc/NotificationService.php
+msgid "%s added a comment"
+msgstr "%s added a comment"
+
+#: inc/NotificationService.php
+msgid "%s was added as %s"
+msgstr "%s was added as %s"
+
+#: inc/NotificationService.php
+msgid "The participation of %s was updated"
+msgstr "The participation of %s was updated"
+
+#: inc/NotificationService.php
+msgid "A validation has been requested for this ticket"
+msgstr "A validation has been requested for this ticket"
+
+#: inc/NotificationService.php
+msgid "Validation accepted by %s"
+msgstr "Validation accepted by %s"
+
+#: inc/NotificationService.php
+msgid "Validation refused by %s"
+msgstr "Validation refused by %s"
+
+#: inc/NotificationService.php
+msgid "Validation updated by %s"
+msgstr "Validation updated by %s"
+
+#: inc/NotificationService.php
+msgid "%s added task: %s"
+msgstr "%s added task: %s"
+
+#: inc/NotificationService.php
+msgid "An event occurred on this ticket"
+msgstr "An event occurred on this ticket"
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - New participant"
+msgstr "Ticket #%d - New participant"
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - Participant updated"
+msgstr "Ticket #%d - Participant updated"
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - Validation requested"
+msgstr "Ticket #%d - Validation requested"
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - Validation updated"
+msgstr "Ticket #%d - Validation updated"
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - New task"
+msgstr "Ticket #%d - New task"
+
+#: inc/NotificationService.php
+msgid "Ticket #%d"
+msgstr "Ticket #%d"
+
+#: hook.php
+msgid "participant"
+msgstr "participant"
+
+#: hook.php
+msgid "requester"
+msgstr "requester"
+
+#: hook.php
+msgid "assigned technician"
+msgstr "assigned technician"
+
+#: hook.php
+msgid "observer"
+msgstr "observer"
+
+#: hook.php
+msgid "Task"
+msgstr "Task"
+
 msgid "Ticket #%d Closed"
 msgstr "Ticket #%d Closed"
 
@@ -335,6 +443,58 @@ msgstr "Invalid file type. Only PNG images are allowed"
 
 msgid "File size exceeds 2MB limit"
 msgstr "File size exceeds 2MB limit"
+
+#: inc/Icon.php
+msgid "File size exceeds 5MB limit"
+msgstr "File size exceeds 5MB limit"
+
+#: inc/Icon.php
+msgid "Icon must be square (same width and height)"
+msgstr "Icon must be square (same width and height)"
+
+#: inc/Icon.php
+msgid "Icon must be at least %dx%d pixels"
+msgstr "Icon must be at least %dx%d pixels"
+
+#: inc/Icon.php
+msgid "Failed to generate %dx%d: %s"
+msgstr "Failed to generate %dx%d: %s"
+
+#: inc/Icon.php
+msgid "Failed to generate maskable icon: %s"
+msgstr "Failed to generate maskable icon: %s"
+
+#: inc/Icon.php
+msgid "Failed to generate any icons"
+msgstr "Failed to generate any icons"
+
+#: inc/Icon.php
+msgid "Successfully generated %d icon sizes"
+msgstr "Successfully generated %d icon sizes"
+
+#: inc/Icon.php
+msgid "Some errors occurred"
+msgstr "Some errors occurred"
+
+#: inc/Icon.php
+msgid "Could not create image"
+msgstr "Could not create image"
+
+#: inc/Icon.php
+msgid "Could not save icon file"
+msgstr "Could not save icon file"
+
+#: inc/Icon.php
+msgid "Could not create maskable image"
+msgstr "Could not create maskable image"
+
+#: inc/Icon.php
+msgid "Could not create safe zone image"
+msgstr "Could not create safe zone image"
+
+#: inc/Icon.php
+msgid "Could not save maskable icon"
+msgstr "Could not save maskable icon"
 
 msgid "Could not create icons directory. Check permissions"
 msgstr "Could not create icons directory. Check permissions"

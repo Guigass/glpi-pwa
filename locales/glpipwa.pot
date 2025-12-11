@@ -211,6 +211,30 @@ msgstr ""
 msgid "Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)"
 msgstr ""
 
+#: inc/Manifest.php
+msgid "Open Ticket"
+msgstr ""
+
+#: inc/Manifest.php
+msgid "New Ticket"
+msgstr ""
+
+#: inc/Manifest.php
+msgid "My Tickets"
+msgstr ""
+
+#: inc/Manifest.php
+msgid "Tickets"
+msgstr ""
+
+#: inc/Manifest.php
+msgid "Knowledge Base"
+msgstr ""
+
+#: inc/Manifest.php
+msgid "KB"
+msgstr ""
+
 #: front/config.form.php
 msgid "Custom Shortcuts"
 msgstr ""
@@ -351,6 +375,90 @@ msgstr ""
 msgid "User"
 msgstr ""
 
+#: inc/NotificationService.php
+msgid "New ticket opened"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "%s added a comment"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "%s was added as %s"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "The participation of %s was updated"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "A validation has been requested for this ticket"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Validation accepted by %s"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Validation refused by %s"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Validation updated by %s"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "%s added task: %s"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "An event occurred on this ticket"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - New participant"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - Participant updated"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - Validation requested"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - Validation updated"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Ticket #%d - New task"
+msgstr ""
+
+#: inc/NotificationService.php
+msgid "Ticket #%d"
+msgstr ""
+
+#: hook.php
+msgid "participant"
+msgstr ""
+
+#: hook.php
+msgid "requester"
+msgstr ""
+
+#: hook.php
+msgid "assigned technician"
+msgstr ""
+
+#: hook.php
+msgid "observer"
+msgstr ""
+
+#: hook.php
+msgid "Task"
+msgstr ""
+
 #: inc/NotificationPush.php
 msgid "Ticket #%d Closed"
 msgstr ""
@@ -441,6 +549,58 @@ msgstr ""
 
 #: inc/Icon.php
 msgid "File size exceeds 2MB limit"
+msgstr ""
+
+#: inc/Icon.php
+msgid "File size exceeds 5MB limit"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Icon must be square (same width and height)"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Icon must be at least %dx%d pixels"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Failed to generate %dx%d: %s"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Failed to generate maskable icon: %s"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Failed to generate any icons"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Successfully generated %d icon sizes"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Some errors occurred"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Could not create image"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Could not save icon file"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Could not create maskable image"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Could not create safe zone image"
+msgstr ""
+
+#: inc/Icon.php
+msgid "Could not save maskable icon"
 msgstr ""
 
 #: inc/Icon.php
