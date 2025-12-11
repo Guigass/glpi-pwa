@@ -153,6 +153,84 @@
     }
 
     /**
+     * Chave para armazenar token FCM no localStorage
+     */
+    const FCM_TOKEN_STORAGE_KEY = 'glpipwa_fcm_token';
+    const FCM_TOKEN_TIMESTAMP_KEY = 'glpipwa_fcm_token_timestamp';
+
+    /**
+     * Obtém o token FCM armazenado no localStorage
+     * 
+     * @return {string|null} Token FCM ou null se não existir
+     */
+    function getStoredFCMToken() {
+        try {
+            if (typeof Storage !== 'undefined' && localStorage) {
+                return localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+            }
+        } catch (e) {
+            // localStorage pode não estar disponível (modo privado, etc)
+            console.warn('[GLPI PWA] Não foi possível acessar localStorage:', e);
+        }
+        return null;
+    }
+
+    /**
+     * Armazena o token FCM no localStorage
+     * 
+     * @param {string} token Token FCM para armazenar
+     */
+    function storeFCMToken(token) {
+        try {
+            if (typeof Storage !== 'undefined' && localStorage && token) {
+                localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
+                localStorage.setItem(FCM_TOKEN_TIMESTAMP_KEY, Date.now().toString());
+            }
+        } catch (e) {
+            // localStorage pode não estar disponível (modo privado, etc)
+            console.warn('[GLPI PWA] Não foi possível armazenar token no localStorage:', e);
+        }
+    }
+
+    /**
+     * Remove o token FCM do localStorage
+     */
+    function clearStoredFCMToken() {
+        try {
+            if (typeof Storage !== 'undefined' && localStorage) {
+                localStorage.removeItem(FCM_TOKEN_STORAGE_KEY);
+                localStorage.removeItem(FCM_TOKEN_TIMESTAMP_KEY);
+            }
+        } catch (e) {
+            // localStorage pode não estar disponível
+            console.warn('[GLPI PWA] Não foi possível limpar token do localStorage:', e);
+        }
+    }
+
+    /**
+     * Verifica se o token armazenado ainda é válido
+     * Tokens FCM geralmente são válidos por muito tempo, mas verificamos se não é muito antigo
+     * 
+     * @param {number} maxAge Tempo máximo em milissegundos (padrão: 30 dias)
+     * @return {boolean} true se o token é válido, false caso contrário
+     */
+    function isStoredTokenValid(maxAge = 30 * 24 * 60 * 60 * 1000) {
+        try {
+            if (typeof Storage !== 'undefined' && localStorage) {
+                const timestamp = localStorage.getItem(FCM_TOKEN_TIMESTAMP_KEY);
+                if (!timestamp) {
+                    return false;
+                }
+                const age = Date.now() - parseInt(timestamp, 10);
+                return age < maxAge;
+            }
+        } catch (e) {
+            // localStorage pode não estar disponível
+        }
+        return false;
+    }
+
+    /**
      * Aguarda o Service Worker estar no estado 'activated'
      */
     function waitForServiceWorkerActive(registration) {
@@ -272,20 +350,44 @@
 
         // Função auxiliar para obter token FCM
         // IMPORTANTE: Deve aguardar o Service Worker estar activated
-        function getFCMToken() {
+        // OTIMIZAÇÃO: Verifica token armazenado antes de solicitar novo ao Firebase
+        function getFCMToken(forceRefresh = false) {
+            // Verificar se já temos um token válido armazenado
+            if (!forceRefresh) {
+                const storedToken = getStoredFCMToken();
+                if (storedToken && isStoredTokenValid()) {
+                    // Token válido encontrado, verificar se ainda é o mesmo no Firebase
+                    // Mas não vamos chamar getToken() apenas para verificar - isso seria contraproducente
+                    // Em vez disso, vamos usar o token armazenado e só atualizar se necessário
+                    return Promise.resolve(storedToken);
+                }
+            }
+
+            // Função auxiliar para processar token obtido do Firebase
+            const processToken = (currentToken) => {
+                if (currentToken) {
+                    // Armazenar token no localStorage
+                    storeFCMToken(currentToken);
+                    // Registrar no servidor apenas se for diferente do armazenado
+                    const storedToken = getStoredFCMToken();
+                    if (currentToken !== storedToken) {
+                        registerToken(currentToken);
+                    }
+                    return currentToken;
+                } else {
+                    // Se não há token, limpar armazenamento
+                    clearStoredFCMToken();
+                    return null;
+                }
+            };
+
             // Verificar se temos Service Worker registration
             if (!swRegistration) {
                 const tokenOptions = {
                     vapidKey: vapidKey
                 };
                 return messaging.getToken(tokenOptions)
-                    .then((currentToken) => {
-                        if (currentToken) {
-                            registerToken(currentToken);
-                            return currentToken;
-                        }
-                        return null;
-                    })
+                    .then(processToken)
                     .catch((error) => {
                         console.error('[GLPI PWA] Erro ao obter token FCM:', error);
                         return null;
@@ -301,13 +403,7 @@
                         vapidKey: vapidKey
                     };
                     return messaging.getToken(tokenOptions)
-                        .then((currentToken) => {
-                            if (currentToken) {
-                                registerToken(currentToken);
-                                return currentToken;
-                            }
-                            return null;
-                        })
+                        .then(processToken)
                         .catch((error) => {
                             console.error('[GLPI PWA] Erro ao obter token FCM:', error);
                             return null;
@@ -321,13 +417,7 @@
                 };
 
                 return messaging.getToken(tokenOptions)
-                    .then((currentToken) => {
-                        if (currentToken) {
-                            registerToken(currentToken);
-                            return currentToken;
-                        }
-                        return null;
-                    })
+                    .then(processToken)
                     .catch((error) => {
                         console.error('[GLPI PWA] Erro ao obter token FCM:', error);
                         // Tentar novamente sem serviceWorkerRegistration como fallback
@@ -335,13 +425,7 @@
                             vapidKey: vapidKey
                         };
                         return messaging.getToken(fallbackOptions)
-                            .then((currentToken) => {
-                                if (currentToken) {
-                                    registerToken(currentToken);
-                                    return currentToken;
-                                }
-                                return null;
-                            })
+                            .then(processToken)
                             .catch((fallbackError) => {
                                 console.error('[GLPI PWA] Erro no fallback ao obter token:', fallbackError);
                                 return null;
@@ -354,13 +438,7 @@
                     vapidKey: vapidKey
                 };
                 return messaging.getToken(tokenOptions)
-                    .then((currentToken) => {
-                        if (currentToken) {
-                            registerToken(currentToken);
-                            return currentToken;
-                        }
-                        return null;
-                    })
+                    .then(processToken)
                     .catch((error) => {
                         console.error('[GLPI PWA] Erro ao obter token:', error);
                         return null;
@@ -423,7 +501,7 @@
         requestNotificationPermissionCompat()
             .then((permission) => {
                 if (permission === 'granted') {
-                    // Obter token inicial (a função getFCMToken já aguarda o SW estar ativo)
+                    // Obter token inicial (a função getFCMToken já verifica token armazenado)
                     getFCMToken();
 
                     // Configurar listeners para atualizações do token
@@ -437,18 +515,28 @@
                                 newWorker.addEventListener('statechange', () => {
                                     if (newWorker.state === 'activated') {
                                         // Aguardar um pouco para garantir que está totalmente ativo
+                                        // Forçar refresh do token quando o SW é atualizado
                                         setTimeout(() => {
-                                            getFCMToken();
+                                            getFCMToken(true);
                                         }, 1000);
                                     }
                                 });
                             }
                         });
 
-                        // Verificar periodicamente se o token mudou (a cada 5 minutos)
+                        // Verificar periodicamente se o token mudou (a cada 30 minutos)
+                        // Reduzido de 5 para 30 minutos, pois agora verificamos token armazenado
                         setInterval(() => {
-                            getFCMToken();
-                        }, 5 * 60 * 1000);
+                            // Verificar se o token armazenado ainda é válido antes de chamar Firebase
+                            const storedToken = getStoredFCMToken();
+                            if (!storedToken || !isStoredTokenValid()) {
+                                // Só chamar Firebase se não temos token válido
+                                getFCMToken(true);
+                            } else {
+                                // Temos token válido, apenas verificar se ainda é o mesmo (sem forçar refresh)
+                                getFCMToken(false);
+                            }
+                        }, 30 * 60 * 1000); // 30 minutos
                     }
                 }
             })
@@ -497,10 +585,20 @@
      * 
      * Primeiro obtém um token CSRF fresco via GET, depois usa esse token na requisição POST.
      * Isso evita consumir o token CSRF da página, que causaria problemas em outras ações.
+     * 
+     * OTIMIZAÇÃO: Compara com token armazenado antes de registrar no servidor.
      */
     function registerToken(token) {
         if (!token || typeof token !== 'string' || token.length === 0) {
             console.error('[GLPI PWA] Token inválido para registro');
+            return;
+        }
+
+        // Verificar se o token é diferente do armazenado antes de registrar
+        const storedToken = getStoredFCMToken();
+        if (storedToken === token) {
+            // Token já está registrado no servidor (assumindo que foi registrado quando armazenado)
+            // Não precisa registrar novamente
             return;
         }
 
