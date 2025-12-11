@@ -57,11 +57,47 @@ msgstr "Invalid Service Account JSON format"
 msgid "Invalid Service Account email format"
 msgstr "Invalid Service Account email format"
 
+msgid "PWA Identity"
+msgstr "PWA Identity"
+
 msgid "Application Name"
 msgstr "Application Name"
 
 msgid "Short Name"
 msgstr "Short Name"
+
+msgid "Description"
+msgstr "Description"
+
+msgid "Language"
+msgstr "Language"
+
+msgid "ISO 639-1 language code (e.g., pt-BR, en-US)"
+msgstr "ISO 639-1 language code (e.g., pt-BR, en-US)"
+
+msgid "Text Direction"
+msgstr "Text Direction"
+
+msgid "Left to Right"
+msgstr "Left to Right"
+
+msgid "Right to Left"
+msgstr "Right to Left"
+
+msgid "PWA Navigation"
+msgstr "PWA Navigation"
+
+msgid "Start URL"
+msgstr "Start URL"
+
+msgid "Scope"
+msgstr "Scope"
+
+msgid "URL scope of the PWA (usually /)"
+msgstr "URL scope of the PWA (usually /)"
+
+msgid "PWA Appearance"
+msgstr "PWA Appearance"
 
 msgid "Theme Color"
 msgstr "Theme Colour"
@@ -69,29 +105,8 @@ msgstr "Theme Colour"
 msgid "Background Color"
 msgstr "Background Colour"
 
-msgid "Start URL"
-msgstr "Start URL"
-
 msgid "Display Mode"
 msgstr "Display Mode"
-
-msgid "Orientation"
-msgstr "Orientation"
-
-msgid "Icons"
-msgstr "Icons"
-
-msgid "Icon 192x192"
-msgstr "Icon 192x192"
-
-msgid "Icon 512x512"
-msgstr "Icon 512x512"
-
-msgid "Save"
-msgstr "Save"
-
-msgid "Send Test Notification"
-msgstr "Send Test Notification"
 
 msgid "Standalone"
 msgstr "Standalone"
@@ -105,6 +120,9 @@ msgstr "Minimal UI"
 msgid "Browser"
 msgstr "Browser"
 
+msgid "Orientation"
+msgstr "Orientation"
+
 msgid "Any"
 msgstr "Any"
 
@@ -114,6 +132,75 @@ msgstr "Portrait"
 msgid "Landscape"
 msgstr "Landscape"
 
+msgid "Icons"
+msgstr "Icons"
+
+msgid "Base Icon"
+msgstr "Base Icon"
+
+msgid "Upload a square PNG icon (minimum 512x512px). All sizes will be generated automatically."
+msgstr "Upload a square PNG icon (minimum 512x512px). All sizes will be generated automatically."
+
+msgid "Available Sizes"
+msgstr "Available Sizes"
+
+msgid "Generated sizes"
+msgstr "Generated sizes"
+
+msgid "Icon 192x192"
+msgstr "Icon 192x192"
+
+msgid "Icon 512x512"
+msgstr "Icon 512x512"
+
+msgid "Shortcuts"
+msgstr "Shortcuts"
+
+msgid "Default Shortcuts"
+msgstr "Default Shortcuts"
+
+msgid "Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)"
+msgstr "Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)"
+
+msgid "Custom Shortcuts"
+msgstr "Custom Shortcuts"
+
+msgid "JSON array of custom shortcuts. Each shortcut must have: name, url. Optional: short_name, icon, icon_sizes"
+msgstr "JSON array of custom shortcuts. Each shortcut must have: name, url. Optional: short_name, icon, icon_sizes"
+
+msgid "Advanced"
+msgstr "Advanced"
+
+msgid "Categories"
+msgstr "Categories"
+
+msgid "Edge Side Panel Width"
+msgstr "Edge Side Panel Width"
+
+msgid "Preferred width for Edge Side Panel (0 to disable)"
+msgstr "Preferred width for Edge Side Panel (0 to disable)"
+
+msgid "Related Application URL"
+msgstr "Related Application URL"
+
+msgid "URL to a related web application manifest"
+msgstr "URL to a related web application manifest"
+
+msgid "Prefer Related Applications"
+msgstr "Prefer Related Applications"
+
+msgid "Prefer related applications over this PWA"
+msgstr "Prefer related applications over this PWA"
+
+msgid "Save"
+msgstr "Save"
+
+msgid "Send Test Notification"
+msgstr "Send Test Notification"
+
+msgid "Invalid PWA configuration. Please check your inputs"
+msgstr "Invalid PWA configuration. Please check your inputs"
+
 msgid "Settings saved successfully"
 msgstr "Settings saved successfully"
 
@@ -122,6 +209,30 @@ msgstr "Error validating settings"
 
 msgid "Invalid security token"
 msgstr "Invalid security token"
+
+msgid "Icon base: File exceeds upload_max_filesize directive"
+msgstr "Icon base: File exceeds upload_max_filesize directive"
+
+msgid "Icon base: File exceeds MAX_FILE_SIZE directive"
+msgstr "Icon base: File exceeds MAX_FILE_SIZE directive"
+
+msgid "Icon base: File was only partially uploaded"
+msgstr "Icon base: File was only partially uploaded"
+
+msgid "Icon base: No file was uploaded"
+msgstr "Icon base: No file was uploaded"
+
+msgid "Icon base: Missing temporary folder"
+msgstr "Icon base: Missing temporary folder"
+
+msgid "Icon base: Failed to write file to disk"
+msgstr "Icon base: Failed to write file to disk"
+
+msgid "Icon base: A PHP extension stopped the file upload"
+msgstr "Icon base: A PHP extension stopped the file upload"
+
+msgid "Icon base: Unknown upload error"
+msgstr "Icon base: Unknown upload error"
 
 msgid "Test Notification"
 msgstr "Test Notification"

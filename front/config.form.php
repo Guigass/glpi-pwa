@@ -75,23 +75,68 @@ if (isset($_POST['update'])) {
         $config['firebase_service_account_json'] = $currentConfig['firebase_service_account_json'] ?? '';
     }
     
-    // PWA - sanitizar inputs
+    // PWA - Identidade
     $config['pwa_name'] = trim($_POST['pwa_name'] ?? 'GLPI Service Desk');
     $config['pwa_short_name'] = trim($_POST['pwa_short_name'] ?? 'GLPI');
+    $config['pwa_description'] = trim($_POST['pwa_description'] ?? '');
+    $config['pwa_lang'] = preg_match('/^[a-z]{2}(-[A-Z]{2})?$/', $_POST['pwa_lang'] ?? 'pt-BR') ? $_POST['pwa_lang'] : 'pt-BR';
+    $config['pwa_dir'] = in_array($_POST['pwa_dir'] ?? 'ltr', ['ltr', 'rtl']) ? $_POST['pwa_dir'] : 'ltr';
+    
+    // PWA - Navegação
+    $config['pwa_start_url'] = preg_match('/^\/.*$/', $_POST['pwa_start_url'] ?? '/index.php?from=pwa') ? $_POST['pwa_start_url'] : '/index.php?from=pwa';
+    $config['pwa_scope'] = preg_match('/^\/.*$/', $_POST['pwa_scope'] ?? '/') ? $_POST['pwa_scope'] : '/';
+    
+    // PWA - Aparência
     $config['pwa_theme_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $_POST['pwa_theme_color'] ?? '') ? $_POST['pwa_theme_color'] : '#0d6efd';
     $config['pwa_background_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $_POST['pwa_background_color'] ?? '') ? $_POST['pwa_background_color'] : '#ffffff';
-    $config['pwa_start_url'] = filter_var($_POST['pwa_start_url'] ?? '/', FILTER_SANITIZE_URL);
     $config['pwa_display'] = in_array($_POST['pwa_display'] ?? 'standalone', ['standalone', 'fullscreen', 'minimal-ui', 'browser']) ? $_POST['pwa_display'] : 'standalone';
     $config['pwa_orientation'] = in_array($_POST['pwa_orientation'] ?? 'any', ['any', 'portrait', 'landscape']) ? $_POST['pwa_orientation'] : 'any';
+    
+    // PWA - Categories
+    if (isset($_POST['pwa_categories']) && is_array($_POST['pwa_categories'])) {
+        $config['pwa_categories'] = json_encode($_POST['pwa_categories']);
+    } else {
+        $config['pwa_categories'] = '';
+    }
+    
+    // PWA - Shortcuts padrão
+    $config['pwa_shortcuts_default_enabled'] = isset($_POST['pwa_shortcuts_default_enabled']) ? '1' : '0';
+    
+    // PWA - Shortcuts customizados
+    if (isset($_POST['pwa_shortcuts_custom'])) {
+        $custom_shortcuts = json_decode($_POST['pwa_shortcuts_custom'], true);
+        if (is_array($custom_shortcuts)) {
+            $config['pwa_shortcuts_custom'] = $_POST['pwa_shortcuts_custom'];
+        } else {
+            $config['pwa_shortcuts_custom'] = '';
+        }
+    } else {
+        $config['pwa_shortcuts_custom'] = '';
+    }
+    
+    // PWA - Edge Side Panel
+    $edge_width = isset($_POST['pwa_edge_panel_width']) ? (int)$_POST['pwa_edge_panel_width'] : 420;
+    $config['pwa_edge_panel_width'] = ($edge_width >= 0 && $edge_width <= 1000) ? $edge_width : 420;
+    
+    // PWA - Related Applications
+    $config['pwa_related_app_url'] = !empty($_POST['pwa_related_app_url']) && filter_var($_POST['pwa_related_app_url'], FILTER_VALIDATE_URL) ? $_POST['pwa_related_app_url'] : '';
+    $config['pwa_prefer_related'] = isset($_POST['pwa_prefer_related']) ? '1' : '0';
+    
+    // Validar configurações antes de salvar
+    if (!PluginGlpipwaConfig::validatePWAConfig($config)) {
+        Session::addMessageAfterRedirect(__('Invalid PWA configuration. Please check your inputs', 'glpipwa'), true, ERROR);
+        Html::redirect($plugin_url);
+        exit;
+    }
     
     // Salvar configurações
     PluginGlpipwaConfig::setMultiple($config);
     Session::addMessageAfterRedirect(__('Settings saved successfully', 'glpipwa'), true, INFO);
     
-    // Upload de ícones
-    if (isset($_FILES['icon_192']) && !empty($_FILES['icon_192']['name'])) {
-        if ($_FILES['icon_192']['error'] === UPLOAD_ERR_OK) {
-            $result = PluginGlpipwaIcon::upload($_FILES['icon_192'], 192);
+    // Upload de ícone base (gera todos os tamanhos automaticamente)
+    if (isset($_FILES['icon_base']) && !empty($_FILES['icon_base']['name'])) {
+        if ($_FILES['icon_base']['error'] === UPLOAD_ERR_OK) {
+            $result = PluginGlpipwaIcon::uploadBase($_FILES['icon_base']);
             if ($result['success']) {
                 Session::addMessageAfterRedirect($result['message'], true, INFO);
             } else {
@@ -100,39 +145,15 @@ if (isset($_POST['update'])) {
         } else {
             // Tratar erros de upload do PHP
             $error_messages = [
-                UPLOAD_ERR_INI_SIZE => __('Icon 192x192: File exceeds upload_max_filesize directive', 'glpipwa'),
-                UPLOAD_ERR_FORM_SIZE => __('Icon 192x192: File exceeds MAX_FILE_SIZE directive', 'glpipwa'),
-                UPLOAD_ERR_PARTIAL => __('Icon 192x192: File was only partially uploaded', 'glpipwa'),
-                UPLOAD_ERR_NO_FILE => __('Icon 192x192: No file was uploaded', 'glpipwa'),
-                UPLOAD_ERR_NO_TMP_DIR => __('Icon 192x192: Missing temporary folder', 'glpipwa'),
-                UPLOAD_ERR_CANT_WRITE => __('Icon 192x192: Failed to write file to disk', 'glpipwa'),
-                UPLOAD_ERR_EXTENSION => __('Icon 192x192: A PHP extension stopped the file upload', 'glpipwa'),
+                UPLOAD_ERR_INI_SIZE => __('Icon base: File exceeds upload_max_filesize directive', 'glpipwa'),
+                UPLOAD_ERR_FORM_SIZE => __('Icon base: File exceeds MAX_FILE_SIZE directive', 'glpipwa'),
+                UPLOAD_ERR_PARTIAL => __('Icon base: File was only partially uploaded', 'glpipwa'),
+                UPLOAD_ERR_NO_FILE => __('Icon base: No file was uploaded', 'glpipwa'),
+                UPLOAD_ERR_NO_TMP_DIR => __('Icon base: Missing temporary folder', 'glpipwa'),
+                UPLOAD_ERR_CANT_WRITE => __('Icon base: Failed to write file to disk', 'glpipwa'),
+                UPLOAD_ERR_EXTENSION => __('Icon base: A PHP extension stopped the file upload', 'glpipwa'),
             ];
-            $message = $error_messages[$_FILES['icon_192']['error']] ?? __('Icon 192x192: Unknown upload error', 'glpipwa');
-            Session::addMessageAfterRedirect($message, true, ERROR);
-        }
-    }
-    
-    if (isset($_FILES['icon_512']) && !empty($_FILES['icon_512']['name'])) {
-        if ($_FILES['icon_512']['error'] === UPLOAD_ERR_OK) {
-            $result = PluginGlpipwaIcon::upload($_FILES['icon_512'], 512);
-            if ($result['success']) {
-                Session::addMessageAfterRedirect($result['message'], true, INFO);
-            } else {
-                Session::addMessageAfterRedirect($result['message'], true, ERROR);
-            }
-        } else {
-            // Tratar erros de upload do PHP
-            $error_messages = [
-                UPLOAD_ERR_INI_SIZE => __('Icon 512x512: File exceeds upload_max_filesize directive', 'glpipwa'),
-                UPLOAD_ERR_FORM_SIZE => __('Icon 512x512: File exceeds MAX_FILE_SIZE directive', 'glpipwa'),
-                UPLOAD_ERR_PARTIAL => __('Icon 512x512: File was only partially uploaded', 'glpipwa'),
-                UPLOAD_ERR_NO_FILE => __('Icon 512x512: No file was uploaded', 'glpipwa'),
-                UPLOAD_ERR_NO_TMP_DIR => __('Icon 512x512: Missing temporary folder', 'glpipwa'),
-                UPLOAD_ERR_CANT_WRITE => __('Icon 512x512: Failed to write file to disk', 'glpipwa'),
-                UPLOAD_ERR_EXTENSION => __('Icon 512x512: A PHP extension stopped the file upload', 'glpipwa'),
-            ];
-            $message = $error_messages[$_FILES['icon_512']['error']] ?? __('Icon 512x512: Unknown upload error', 'glpipwa');
+            $message = $error_messages[$_FILES['icon_base']['error']] ?? __('Icon base: Unknown upload error', 'glpipwa');
             Session::addMessageAfterRedirect($message, true, ERROR);
         }
     }
@@ -205,8 +226,8 @@ echo "<td><input type='file' name='firebase_service_account_json' accept='applic
 echo "<small>" . __('Upload the service account JSON file from Firebase Console', 'glpipwa') . "</small></td>";
 echo "</tr>";
 
-// Seção PWA
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Configuration', 'glpipwa') . "</th></tr>";
+// Seção PWA - Identidade
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Identity', 'glpipwa') . "</th></tr>";
 
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('Application Name', 'glpipwa') . "</td>";
@@ -219,6 +240,47 @@ echo "<td><input type='text' name='pwa_short_name' value='" . htmlspecialchars($
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Description', 'glpipwa') . "</td>";
+echo "<td><textarea name='pwa_description' rows='3' cols='60'>" . htmlspecialchars($config['pwa_description'] ?? '') . "</textarea></td>";
+echo "</tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Language', 'glpipwa') . "</td>";
+echo "<td><input type='text' name='pwa_lang' value='" . htmlspecialchars($config['pwa_lang'] ?? 'pt-BR') . "' size='10' placeholder='pt-BR'><br>";
+echo "<small>" . __('ISO 639-1 language code (e.g., pt-BR, en-US)', 'glpipwa') . "</small></td>";
+echo "</tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Text Direction', 'glpipwa') . "</td>";
+echo "<td>";
+echo "<select name='pwa_dir'>";
+$directions = ['ltr' => __('Left to Right', 'glpipwa'), 'rtl' => __('Right to Left', 'glpipwa')];
+foreach ($directions as $value => $label) {
+    $selected = ($config['pwa_dir'] ?? 'ltr') === $value ? 'selected' : '';
+    echo "<option value='$value' $selected>$label</option>";
+}
+echo "</select>";
+echo "</td>";
+echo "</tr>";
+
+// Seção PWA - Navegação
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Navigation', 'glpipwa') . "</th></tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Start URL', 'glpipwa') . "</td>";
+echo "<td><input type='text' name='pwa_start_url' value='" . htmlspecialchars($config['pwa_start_url'] ?? '/index.php?from=pwa') . "' size='60'></td>";
+echo "</tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Scope', 'glpipwa') . "</td>";
+echo "<td><input type='text' name='pwa_scope' value='" . htmlspecialchars($config['pwa_scope'] ?? '/') . "' size='60'><br>";
+echo "<small>" . __('URL scope of the PWA (usually /)', 'glpipwa') . "</small></td>";
+echo "</tr>";
+
+// Seção PWA - Aparência
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Appearance', 'glpipwa') . "</th></tr>";
+
+echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('Theme Color', 'glpipwa') . "</td>";
 echo "<td><input type='color' name='pwa_theme_color' value='" . htmlspecialchars($config['pwa_theme_color'] ?? '#0d6efd') . "'></td>";
 echo "</tr>";
@@ -226,11 +288,6 @@ echo "</tr>";
 echo "<tr class='tab_bg_2'>";
 echo "<td>" . __('Background Color', 'glpipwa') . "</td>";
 echo "<td><input type='color' name='pwa_background_color' value='" . htmlspecialchars($config['pwa_background_color'] ?? '#ffffff') . "'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Start URL', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_start_url' value='" . htmlspecialchars($config['pwa_start_url'] ?? '/') . "' size='60'></td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
@@ -263,13 +320,73 @@ echo "</tr>";
 echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Icons', 'glpipwa') . "</th></tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Icon 192x192', 'glpipwa') . "</td>";
-echo "<td><input type='file' name='icon_192' accept='image/png'></td>";
+echo "<td>" . __('Base Icon', 'glpipwa') . "</td>";
+echo "<td><input type='file' name='icon_base' accept='image/png'><br>";
+echo "<small>" . __('Upload a square PNG icon (minimum 512x512px). All sizes will be generated automatically.', 'glpipwa') . "</small></td>";
+echo "</tr>";
+
+// Mostrar ícones disponíveis
+$available_sizes = PluginGlpipwaIcon::getAvailableSizes();
+if (!empty($available_sizes)) {
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Available Sizes', 'glpipwa') . "</td>";
+    echo "<td><small>" . __('Generated sizes', 'glpipwa') . ": " . implode(', ', $available_sizes) . "px";
+    if (PluginGlpipwaIcon::exists(512, true)) {
+        echo " (+ maskable)";
+    }
+    echo "</small></td>";
+    echo "</tr>";
+}
+
+// Seção Shortcuts
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Shortcuts', 'glpipwa') . "</th></tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Default Shortcuts', 'glpipwa') . "</td>";
+echo "<td><input type='checkbox' name='pwa_shortcuts_default_enabled' value='1' " . (($config['pwa_shortcuts_default_enabled'] ?? '1') == '1' ? 'checked' : '') . "> ";
+echo __('Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)', 'glpipwa') . "</td>";
 echo "</tr>";
 
 echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Icon 512x512', 'glpipwa') . "</td>";
-echo "<td><input type='file' name='icon_512' accept='image/png'></td>";
+echo "<td>" . __('Custom Shortcuts', 'glpipwa') . "</td>";
+echo "<td><textarea name='pwa_shortcuts_custom' rows='5' cols='60' placeholder='[{\"name\":\"Custom Shortcut\",\"short_name\":\"Shortcut\",\"url\":\"/front/page.php\",\"icon\":\"/path/to/icon.png\",\"icon_sizes\":\"96x96\"}]'>" . htmlspecialchars($config['pwa_shortcuts_custom'] ?? '') . "</textarea><br>";
+echo "<small>" . __('JSON array of custom shortcuts. Each shortcut must have: name, url. Optional: short_name, icon, icon_sizes', 'glpipwa') . "</small></td>";
+echo "</tr>";
+
+// Seção Avançado
+echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Advanced', 'glpipwa') . "</th></tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Categories', 'glpipwa') . "</td>";
+echo "<td>";
+$all_categories = ['productivity', 'business', 'utilities', 'collaboration', 'education', 'entertainment', 'finance', 'food', 'games', 'health', 'lifestyle', 'magazines', 'medical', 'music', 'news', 'photo', 'shopping', 'social', 'sports', 'travel', 'weather'];
+$selected_categories = !empty($config['pwa_categories']) ? json_decode($config['pwa_categories'], true) : [];
+if (!is_array($selected_categories)) {
+    $selected_categories = [];
+}
+foreach ($all_categories as $cat) {
+    $checked = in_array($cat, $selected_categories) ? 'checked' : '';
+    echo "<input type='checkbox' name='pwa_categories[]' value='$cat' $checked> " . ucfirst($cat) . "<br>";
+}
+echo "</td>";
+echo "</tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Edge Side Panel Width', 'glpipwa') . "</td>";
+echo "<td><input type='number' name='pwa_edge_panel_width' value='" . htmlspecialchars($config['pwa_edge_panel_width'] ?? '420') . "' min='0' max='1000' size='10'> px<br>";
+echo "<small>" . __('Preferred width for Edge Side Panel (0 to disable)', 'glpipwa') . "</small></td>";
+echo "</tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Related Application URL', 'glpipwa') . "</td>";
+echo "<td><input type='url' name='pwa_related_app_url' value='" . htmlspecialchars($config['pwa_related_app_url'] ?? '') . "' size='60'><br>";
+echo "<small>" . __('URL to a related web application manifest', 'glpipwa') . "</small></td>";
+echo "</tr>";
+
+echo "<tr class='tab_bg_2'>";
+echo "<td>" . __('Prefer Related Applications', 'glpipwa') . "</td>";
+echo "<td><input type='checkbox' name='pwa_prefer_related' value='1' " . (($config['pwa_prefer_related'] ?? '0') == '1' ? 'checked' : '') . "> ";
+echo __('Prefer related applications over this PWA', 'glpipwa') . "</td>";
 echo "</tr>";
 
 // Botões

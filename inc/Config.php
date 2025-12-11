@@ -134,6 +134,73 @@ class PluginGlpipwaConfig
             return false;
         }
 
+        // Validar idioma (formato ISO 639-1 com código de país opcional)
+        if (!empty($config['pwa_lang']) && !preg_match('/^[a-z]{2}(-[A-Z]{2})?$/', $config['pwa_lang'])) {
+            return false;
+        }
+
+        // Validar direção (ltr ou rtl)
+        if (!empty($config['pwa_dir']) && !in_array($config['pwa_dir'], ['ltr', 'rtl'])) {
+            return false;
+        }
+
+        // Validar scope (deve ser uma URL relativa válida começando com /)
+        if (!empty($config['pwa_scope']) && !preg_match('/^\/.*$/', $config['pwa_scope'])) {
+            return false;
+        }
+
+        // Validar start_url (deve ser uma URL relativa válida)
+        if (!empty($config['pwa_start_url']) && !preg_match('/^\/.*$/', $config['pwa_start_url'])) {
+            return false;
+        }
+
+        // Validar categories (deve ser JSON array válido)
+        if (!empty($config['pwa_categories'])) {
+            $categories = json_decode($config['pwa_categories'], true);
+            if (!is_array($categories)) {
+                return false;
+            }
+            // Validar que são strings válidas
+            foreach ($categories as $category) {
+                if (!is_string($category)) {
+                    return false;
+                }
+            }
+        }
+
+        // Validar shortcuts customizados (deve ser JSON array válido)
+        if (!empty($config['pwa_shortcuts_custom'])) {
+            $shortcuts = json_decode($config['pwa_shortcuts_custom'], true);
+            if (!is_array($shortcuts)) {
+                return false;
+            }
+            // Validar estrutura dos shortcuts
+            foreach ($shortcuts as $shortcut) {
+                if (!is_array($shortcut) || empty($shortcut['name']) || empty($shortcut['url'])) {
+                    return false;
+                }
+                // Validar URL do shortcut
+                if (!preg_match('/^\/.*$/', $shortcut['url'])) {
+                    return false;
+                }
+            }
+        }
+
+        // Validar edge panel width (deve ser inteiro positivo)
+        if (isset($config['pwa_edge_panel_width'])) {
+            $width = (int)$config['pwa_edge_panel_width'];
+            if ($width < 0 || $width > 1000) {
+                return false;
+            }
+        }
+
+        // Validar related app URL (deve ser URL válida)
+        if (!empty($config['pwa_related_app_url'])) {
+            if (!filter_var($config['pwa_related_app_url'], FILTER_VALIDATE_URL)) {
+                return false;
+            }
+        }
+
         return true;
     }
 }

@@ -110,9 +110,12 @@ glpipwa/
 ├── pics/                           # Ícones e imagens
 │   └── glpipwa.png                 # Ícone do plugin
 │
-├── locale/                         # Traduções
+├── locales/                        # Traduções
 │   ├── pt_BR.po                    # Strings em português
-│   └── pt_BR.mo                    # Arquivo compilado
+│   ├── pt_BR.mo                    # Arquivo compilado
+│   ├── en_GB.po                    # Strings em inglês
+│   ├── en_GB.mo                    # Arquivo compilado
+│   └── glpipwa.pot                 # Template de tradução
 │
 └── tools/                          # Scripts auxiliares
     ├── compile-mo.js               # Compilador .po → .mo (Node.js)
@@ -168,14 +171,14 @@ glpipwa/
 Para compilar arquivos `.po` para `.mo`:
 
 ```bash
-# Usando Node.js
-node tools/compile-mo.js
+# Usando Node.js (nova estrutura)
+node tools/compile-mo-new.js
 
-# Ou usando PHP
-php tools/compile-mo.php
+# Ou usando PHP (nova estrutura)
+php tools/compile-mo-new.php
 
 # Ou usando gettext (se disponível)
-msgfmt -o locale/pt_BR.mo locale/pt_BR.po
+msgfmt -o locales/pt_BR.mo locales/pt_BR.po
 ```
 
 ### Padrões de Código

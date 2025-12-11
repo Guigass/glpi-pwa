@@ -1,0 +1,550 @@
+# GLPI PWA Plugin - Portuguese (Brazil) Translation
+# Copyright (C) 2024 GLPI Community
+# This file is distributed under the same license as the GLPI PWA plugin.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: GLPI PWA 1.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: 2024-12-19 12:00+0000\n"
+"Last-Translator: GLPI Community\n"
+"Language-Team: Portuguese (Brazil) <pt_BR@li.org>\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: setup.php
+msgid "GLPI PWA"
+msgstr "GLPI PWA"
+
+#: front/config.form.php
+msgid "PWA Configuration"
+msgstr "Configuração PWA"
+
+#: front/config.form.php
+msgid "Firebase Configuration"
+msgstr "Configuração Firebase"
+
+#: front/config.form.php
+msgid "API Key"
+msgstr "Chave da API"
+
+#: front/config.form.php
+msgid "Project ID"
+msgstr "ID do Projeto"
+
+#: front/config.form.php
+msgid "Messaging Sender ID"
+msgstr "ID do Remetente de Mensagens"
+
+#: front/config.form.php
+msgid "App ID"
+msgstr "ID do Aplicativo"
+
+#: front/config.form.php
+msgid "VAPID Key"
+msgstr "Chave VAPID"
+
+#: front/config.form.php
+msgid "Firebase Service Account (FCM v1)"
+msgstr "Conta de Serviço Firebase (FCM v1)"
+
+#: front/config.form.php
+msgid "Service Account JSON File"
+msgstr "Arquivo JSON da Conta de Serviço"
+
+#: front/config.form.php
+msgid "Upload the service account JSON file from Firebase Console"
+msgstr "Envie o arquivo JSON da conta de serviço do Console Firebase"
+
+#: front/config.form.php
+msgid "Invalid Service Account JSON: invalid email"
+msgstr "JSON da Conta de Serviço inválido: e-mail inválido"
+
+#: front/config.form.php
+msgid "Invalid Service Account JSON format"
+msgstr "Formato JSON da Conta de Serviço inválido"
+
+#: front/config.form.php
+msgid "Invalid Service Account email format"
+msgstr "Formato de e-mail da Conta de Serviço inválido"
+
+#: front/config.form.php
+msgid "PWA Identity"
+msgstr "Identidade PWA"
+
+#: front/config.form.php
+msgid "Application Name"
+msgstr "Nome do Aplicativo"
+
+#: front/config.form.php
+msgid "Short Name"
+msgstr "Nome Curto"
+
+#: front/config.form.php
+msgid "Description"
+msgstr "Descrição"
+
+#: front/config.form.php
+msgid "Language"
+msgstr "Idioma"
+
+#: front/config.form.php
+msgid "ISO 639-1 language code (e.g., pt-BR, en-US)"
+msgstr "Código de idioma ISO 639-1 (ex: pt-BR, en-US)"
+
+#: front/config.form.php
+msgid "Text Direction"
+msgstr "Direção do Texto"
+
+#: front/config.form.php
+msgid "Left to Right"
+msgstr "Esquerda para Direita"
+
+#: front/config.form.php
+msgid "Right to Left"
+msgstr "Direita para Esquerda"
+
+#: front/config.form.php
+msgid "PWA Navigation"
+msgstr "Navegação PWA"
+
+#: front/config.form.php
+msgid "Start URL"
+msgstr "URL Inicial"
+
+#: front/config.form.php
+msgid "Scope"
+msgstr "Escopo"
+
+#: front/config.form.php
+msgid "URL scope of the PWA (usually /)"
+msgstr "Escopo de URL do PWA (geralmente /)"
+
+#: front/config.form.php
+msgid "PWA Appearance"
+msgstr "Aparência PWA"
+
+#: front/config.form.php
+msgid "Theme Color"
+msgstr "Cor do Tema"
+
+#: front/config.form.php
+msgid "Background Color"
+msgstr "Cor de Fundo"
+
+#: front/config.form.php
+msgid "Display Mode"
+msgstr "Modo de Exibição"
+
+#: front/config.form.php
+msgid "Standalone"
+msgstr "Standalone"
+
+#: front/config.form.php
+msgid "Fullscreen"
+msgstr "Tela Cheia"
+
+#: front/config.form.php
+msgid "Minimal UI"
+msgstr "Interface Mínima"
+
+#: front/config.form.php
+msgid "Browser"
+msgstr "Navegador"
+
+#: front/config.form.php
+msgid "Orientation"
+msgstr "Orientação"
+
+#: front/config.form.php
+msgid "Any"
+msgstr "Qualquer"
+
+#: front/config.form.php
+msgid "Portrait"
+msgstr "Retrato"
+
+#: front/config.form.php
+msgid "Landscape"
+msgstr "Paisagem"
+
+#: front/config.form.php
+msgid "Icons"
+msgstr "Ícones"
+
+#: front/config.form.php
+msgid "Base Icon"
+msgstr "Ícone Base"
+
+#: front/config.form.php
+msgid "Upload a square PNG icon (minimum 512x512px). All sizes will be generated automatically."
+msgstr "Envie um ícone PNG quadrado (mínimo 512x512px). Todos os tamanhos serão gerados automaticamente."
+
+#: front/config.form.php
+msgid "Available Sizes"
+msgstr "Tamanhos Disponíveis"
+
+#: front/config.form.php
+msgid "Generated sizes"
+msgstr "Tamanhos gerados"
+
+#: front/config.form.php
+msgid "Icon 192x192"
+msgstr "Ícone 192x192"
+
+#: front/config.form.php
+msgid "Icon 512x512"
+msgstr "Ícone 512x512"
+
+#: front/config.form.php
+msgid "Shortcuts"
+msgstr "Atalhos"
+
+#: front/config.form.php
+msgid "Default Shortcuts"
+msgstr "Atalhos Padrão"
+
+#: front/config.form.php
+msgid "Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)"
+msgstr "Habilitar atalhos padrão do GLPI (Novo Chamado, Meus Chamados, Base de Conhecimento)"
+
+#: front/config.form.php
+msgid "Custom Shortcuts"
+msgstr "Atalhos Personalizados"
+
+#: front/config.form.php
+msgid "JSON array of custom shortcuts. Each shortcut must have: name, url. Optional: short_name, icon, icon_sizes"
+msgstr "Array JSON de atalhos personalizados. Cada atalho deve ter: name, url. Opcional: short_name, icon, icon_sizes"
+
+#: front/config.form.php
+msgid "Advanced"
+msgstr "Avançado"
+
+#: front/config.form.php
+msgid "Categories"
+msgstr "Categorias"
+
+#: front/config.form.php
+msgid "Edge Side Panel Width"
+msgstr "Largura do Painel Lateral do Edge"
+
+#: front/config.form.php
+msgid "Preferred width for Edge Side Panel (0 to disable)"
+msgstr "Largura preferida para o Painel Lateral do Edge (0 para desabilitar)"
+
+#: front/config.form.php
+msgid "Related Application URL"
+msgstr "URL do Aplicativo Relacionado"
+
+#: front/config.form.php
+msgid "URL to a related web application manifest"
+msgstr "URL para um manifesto de aplicativo web relacionado"
+
+#: front/config.form.php
+msgid "Prefer Related Applications"
+msgstr "Preferir Aplicativos Relacionados"
+
+#: front/config.form.php
+msgid "Prefer related applications over this PWA"
+msgstr "Preferir aplicativos relacionados a este PWA"
+
+#: front/config.form.php
+msgid "Save"
+msgstr "Salvar"
+
+#: front/config.form.php
+msgid "Send Test Notification"
+msgstr "Enviar Notificação de Teste"
+
+#: front/config.form.php
+msgid "Invalid PWA configuration. Please check your inputs"
+msgstr "Configuração PWA inválida. Por favor, verifique suas entradas"
+
+#: front/config.form.php
+msgid "Settings saved successfully"
+msgstr "Configurações salvas com sucesso"
+
+#: front/config.form.php
+msgid "Error validating settings"
+msgstr "Erro ao validar configurações"
+
+#: front/config.form.php
+msgid "Invalid security token"
+msgstr "Token de segurança inválido"
+
+#: front/config.form.php
+msgid "Icon base: File exceeds upload_max_filesize directive"
+msgstr "Ícone base: Arquivo excede a diretiva upload_max_filesize"
+
+#: front/config.form.php
+msgid "Icon base: File exceeds MAX_FILE_SIZE directive"
+msgstr "Ícone base: Arquivo excede a diretiva MAX_FILE_SIZE"
+
+#: front/config.form.php
+msgid "Icon base: File was only partially uploaded"
+msgstr "Ícone base: Arquivo foi apenas parcialmente enviado"
+
+#: front/config.form.php
+msgid "Icon base: No file was uploaded"
+msgstr "Ícone base: Nenhum arquivo foi enviado"
+
+#: front/config.form.php
+msgid "Icon base: Missing temporary folder"
+msgstr "Ícone base: Pasta temporária ausente"
+
+#: front/config.form.php
+msgid "Icon base: Failed to write file to disk"
+msgstr "Ícone base: Falha ao escrever arquivo no disco"
+
+#: front/config.form.php
+msgid "Icon base: A PHP extension stopped the file upload"
+msgstr "Ícone base: Uma extensão PHP interrompeu o envio do arquivo"
+
+#: front/config.form.php
+msgid "Icon base: Unknown upload error"
+msgstr "Ícone base: Erro de envio desconhecido"
+
+#: front/config.form.php
+msgid "Test Notification"
+msgstr "Notificação de Teste"
+
+#: front/config.form.php
+msgid "This is a test notification from the PWA plugin"
+msgstr "Esta é uma notificação de teste do plugin PWA"
+
+#: front/config.form.php
+msgid "Test notification sent"
+msgstr "Notificação de teste enviada"
+
+#: front/config.form.php
+msgid "Error sending test notification"
+msgstr "Erro ao enviar notificação de teste"
+
+#: inc/NotificationPush.php
+msgid "New Ticket #%d"
+msgstr "Novo Chamado #%d"
+
+#: inc/NotificationPush.php
+msgid "Ticket opened by %s - Urgency: %s"
+msgstr "Chamado aberto por %s - Urgência: %s"
+
+#: inc/NotificationPush.php
+msgid "Ticket #%d Updated"
+msgstr "Chamado #%d Atualizado"
+
+#: inc/NotificationPush.php
+msgid "The ticket has been updated"
+msgstr "O chamado foi atualizado"
+
+#: inc/NotificationPush.php
+msgid "New interaction on Ticket #%d"
+msgstr "Nova interação no Chamado #%d"
+
+#: inc/NotificationPush.php
+msgid "%s commented: %s"
+msgstr "%s comentou: %s"
+
+#: inc/NotificationPush.php
+msgid "User"
+msgstr "Usuário"
+
+#: inc/NotificationPush.php
+msgid "Ticket #%d Closed"
+msgstr "Chamado #%d Fechado"
+
+#: inc/NotificationPush.php
+msgid "Ticket closed by %s"
+msgstr "Chamado fechado por %s"
+
+#: inc/NotificationPush.php
+msgid "Ticket #%d Solved"
+msgstr "Chamado #%d Resolvido"
+
+#: inc/NotificationPush.php
+msgid "Ticket solved by %s - Awaiting validation"
+msgstr "Chamado resolvido por %s - Aguardando validação"
+
+#: inc/NotificationPush.php
+msgid "Ticket #%d Assigned"
+msgstr "Chamado #%d Atribuído"
+
+#: inc/NotificationPush.php
+msgid "Ticket assigned to: %s"
+msgstr "Chamado atribuído a: %s"
+
+#: inc/NotificationPush.php
+msgid "System"
+msgstr "Sistema"
+
+#: inc/NotificationPush.php
+msgid "Unassigned"
+msgstr "Não atribuído"
+
+#: inc/Cron.php
+msgid "GLPI PWA Token Cleanup"
+msgstr "Limpeza de Tokens GLPI PWA"
+
+#: inc/Cron.php
+msgid "Clean expired FCM tokens"
+msgstr "Limpar tokens FCM expirados"
+
+#: inc/Icon.php
+msgid "Invalid icon size"
+msgstr "Tamanho de ícone inválido"
+
+#: inc/Icon.php
+msgid "No file uploaded"
+msgstr "Nenhum arquivo enviado"
+
+#: inc/Icon.php
+msgid "File exceeds upload_max_filesize directive"
+msgstr "Arquivo excede a diretiva upload_max_filesize"
+
+#: inc/Icon.php
+msgid "File exceeds MAX_FILE_SIZE directive"
+msgstr "Arquivo excede a diretiva MAX_FILE_SIZE"
+
+#: inc/Icon.php
+msgid "File was only partially uploaded"
+msgstr "Arquivo foi apenas parcialmente enviado"
+
+#: inc/Icon.php
+msgid "Missing temporary folder"
+msgstr "Pasta temporária ausente"
+
+#: inc/Icon.php
+msgid "Failed to write file to disk"
+msgstr "Falha ao escrever arquivo no disco"
+
+#: inc/Icon.php
+msgid "A PHP extension stopped the file upload"
+msgstr "Uma extensão PHP interrompeu o envio do arquivo"
+
+#: inc/Icon.php
+msgid "Unknown upload error"
+msgstr "Erro de envio desconhecido"
+
+#: inc/Icon.php
+msgid "GD extension is not available"
+msgstr "Extensão GD não está disponível"
+
+#: inc/Icon.php
+msgid "Could not determine file type"
+msgstr "Não foi possível determinar o tipo de arquivo"
+
+#: inc/Icon.php
+msgid "Invalid file type. Only PNG images are allowed"
+msgstr "Tipo de arquivo inválido. Apenas imagens PNG são permitidas"
+
+#: inc/Icon.php
+msgid "File size exceeds 2MB limit"
+msgstr "Tamanho do arquivo excede o limite de 2MB"
+
+#: inc/Icon.php
+msgid "Could not create icons directory. Check permissions"
+msgstr "Não foi possível criar o diretório de ícones. Verifique as permissões"
+
+#: inc/Icon.php
+msgid "Icons directory does not exist and could not be created"
+msgstr "Diretório de ícones não existe e não pôde ser criado"
+
+#: inc/Icon.php
+msgid "Parent directory is also not writable"
+msgstr "Diretório pai também não é gravável"
+
+#: inc/Icon.php
+msgid "Icons directory is not writable. Check permissions"
+msgstr "Diretório de ícones não é gravável. Verifique as permissões"
+
+#: inc/Icon.php
+msgid "Icons directory is not writable"
+msgstr "Diretório de ícones não é gravável"
+
+#: inc/Icon.php
+msgid "To fix this, run the following command as root"
+msgstr "Para corrigir isso, execute o seguinte comando como root"
+
+#: inc/Icon.php
+msgid "Could not load image. File may be corrupted or not a valid PNG"
+msgstr "Não foi possível carregar a imagem. O arquivo pode estar corrompido ou não ser um PNG válido"
+
+#: inc/Icon.php
+msgid "Could not create resized image"
+msgstr "Não foi possível criar a imagem redimensionada"
+
+#: inc/Icon.php
+msgid "Could not save icon file. Check directory permissions"
+msgstr "Não foi possível salvar o arquivo de ícone. Verifique as permissões do diretório"
+
+#: inc/Icon.php
+msgid "Icon %dx%d uploaded successfully"
+msgstr "Ícone %dx%d enviado com sucesso"
+
+#: inc/Icon.php
+msgid "Icon 192x192: File exceeds upload_max_filesize directive"
+msgstr "Ícone 192x192: Arquivo excede a diretiva upload_max_filesize"
+
+#: inc/Icon.php
+msgid "Icon 192x192: File exceeds MAX_FILE_SIZE directive"
+msgstr "Ícone 192x192: Arquivo excede a diretiva MAX_FILE_SIZE"
+
+#: inc/Icon.php
+msgid "Icon 192x192: File was only partially uploaded"
+msgstr "Ícone 192x192: Arquivo foi apenas parcialmente enviado"
+
+#: inc/Icon.php
+msgid "Icon 192x192: No file was uploaded"
+msgstr "Ícone 192x192: Nenhum arquivo foi enviado"
+
+#: inc/Icon.php
+msgid "Icon 192x192: Missing temporary folder"
+msgstr "Ícone 192x192: Pasta temporária ausente"
+
+#: inc/Icon.php
+msgid "Icon 192x192: Failed to write file to disk"
+msgstr "Ícone 192x192: Falha ao escrever arquivo no disco"
+
+#: inc/Icon.php
+msgid "Icon 192x192: A PHP extension stopped the file upload"
+msgstr "Ícone 192x192: Uma extensão PHP interrompeu o envio do arquivo"
+
+#: inc/Icon.php
+msgid "Icon 192x192: Unknown upload error"
+msgstr "Ícone 192x192: Erro de envio desconhecido"
+
+#: inc/Icon.php
+msgid "Icon 512x512: File exceeds upload_max_filesize directive"
+msgstr "Ícone 512x512: Arquivo excede a diretiva upload_max_filesize"
+
+#: inc/Icon.php
+msgid "Icon 512x512: File exceeds MAX_FILE_SIZE directive"
+msgstr "Ícone 512x512: Arquivo excede a diretiva MAX_FILE_SIZE"
+
+#: inc/Icon.php
+msgid "Icon 512x512: File was only partially uploaded"
+msgstr "Ícone 512x512: Arquivo foi apenas parcialmente enviado"
+
+#: inc/Icon.php
+msgid "Icon 512x512: No file was uploaded"
+msgstr "Ícone 512x512: Nenhum arquivo foi enviado"
+
+#: inc/Icon.php
+msgid "Icon 512x512: Missing temporary folder"
+msgstr "Ícone 512x512: Pasta temporária ausente"
+
+#: inc/Icon.php
+msgid "Icon 512x512: Failed to write file to disk"
+msgstr "Ícone 512x512: Falha ao escrever arquivo no disco"
+
+#: inc/Icon.php
+msgid "Icon 512x512: A PHP extension stopped the file upload"
+msgstr "Ícone 512x512: Uma extensão PHP interrompeu o envio do arquivo"
+
+#: inc/Icon.php
+msgid "Icon 512x512: Unknown upload error"
+msgstr "Ícone 512x512: Erro de envio desconhecido"
+
