@@ -65,7 +65,7 @@ class PluginGlpipwaFirebaseAuth
         $serviceAccount = self::getServiceAccountCredentials();
         
         if (!$serviceAccount) {
-            Toolbox::logError("GLPI PWA: Service Account não configurado");
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Service Account não configurado", LOG_ERR);
             return false;
         }
 
@@ -73,7 +73,7 @@ class PluginGlpipwaFirebaseAuth
         $jwt = self::generateJWT($serviceAccount);
         
         if (!$jwt) {
-            Toolbox::logError("GLPI PWA: Erro ao gerar JWT");
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao gerar JWT", LOG_ERR);
             return false;
         }
 
@@ -81,7 +81,7 @@ class PluginGlpipwaFirebaseAuth
         $accessToken = self::exchangeJWTForToken($jwt);
         
         if (!$accessToken) {
-            Toolbox::logError("GLPI PWA: Erro ao obter access token");
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter access token", LOG_ERR);
             return false;
         }
 
@@ -171,14 +171,14 @@ class PluginGlpipwaFirebaseAuth
         
         $privateKey = openssl_pkey_get_private($serviceAccount['private_key']);
         if (!$privateKey) {
-            Toolbox::logError("GLPI PWA: Erro ao carregar chave privada: " . openssl_error_string());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao carregar chave privada: " . openssl_error_string(), LOG_ERR);
             return false;
         }
 
         $signature = '';
         if (!openssl_sign($signatureInput, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
             openssl_free_key($privateKey);
-            Toolbox::logError("GLPI PWA: Erro ao assinar JWT: " . openssl_error_string());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao assinar JWT: " . openssl_error_string(), LOG_ERR);
             return false;
         }
 
@@ -217,19 +217,19 @@ class PluginGlpipwaFirebaseAuth
         curl_close($ch);
 
         if ($error) {
-            Toolbox::logError("GLPI PWA: Erro cURL ao obter access token: " . $error);
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro cURL ao obter access token: " . $error, LOG_ERR);
             return false;
         }
 
         if ($httpCode !== 200) {
-            Toolbox::logError("GLPI PWA: Erro HTTP ao obter access token: " . $httpCode . " - " . $response);
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro HTTP ao obter access token: " . $httpCode . " - " . $response, LOG_ERR);
             return false;
         }
 
         $result = json_decode($response, true);
         
         if (!isset($result['access_token'])) {
-            Toolbox::logError("GLPI PWA: Access token não encontrado na resposta: " . $response);
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Access token não encontrado na resposta: " . $response, LOG_ERR);
             return false;
         }
 

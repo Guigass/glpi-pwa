@@ -459,7 +459,7 @@ class PluginGlpipwaNotificationService
             if (!is_dir($logDir) && !mkdir($logDir, 0755, true)) {
                 // Se não conseguir criar, usar Toolbox como fallback
                 if (class_exists('Toolbox')) {
-                    Toolbox::logDebug("GLPI PWA NotificationService: " . $message);
+                    Toolbox::logInFile('glpipwa', "GLPI PWA NotificationService: " . $message, LOG_DEBUG);
                 }
                 return;
             }
@@ -479,9 +479,9 @@ class PluginGlpipwaNotificationService
             if ($level === 'error' || $level === 'warning') {
                 if (class_exists('Toolbox')) {
                     if ($level === 'error') {
-                        Toolbox::logError("GLPI PWA NotificationService: " . $message);
+                        Toolbox::logInFile('glpipwa', "GLPI PWA NotificationService: " . $message, LOG_ERR);
                     } else {
-                        Toolbox::logWarning("GLPI PWA NotificationService: " . $message);
+                        Toolbox::logInFile('glpipwa', "GLPI PWA NotificationService: " . $message, LOG_WARNING);
                     }
                 }
             }

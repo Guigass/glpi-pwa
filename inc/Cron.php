@@ -85,7 +85,7 @@ class PluginGlpipwaCron extends CommonDBTM
             
             return 1;
         } catch (Exception $e) {
-            Toolbox::logError('GLPI PWA Cron Error: ' . $e->getMessage());
+            Toolbox::logInFile('glpipwa', 'GLPI PWA Cron Error: ' . $e->getMessage(), LOG_ERR);
             return 0;
         }
     }

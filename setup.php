@@ -100,12 +100,9 @@ function plugin_init_glpipwa() {
     // Carregar classes do plugin
     plugin_glpipwa_load_classes();
 
-    // Registrar domínio de tradução do plugin
-    // O GLPI carrega traduções de plugins usando Plugin::loadTranslation()
-    // O textdomain deve ser exatamente igual ao nome da pasta do plugin
-    if (class_exists('Plugin')) {
-        Plugin::loadTranslation('glpipwa');
-    }
+    // No GLPI 11, as traduções são carregadas automaticamente pelo sistema
+    // O textdomain usado nas funções __() deve ser exatamente igual ao nome da pasta do plugin ('glpipwa')
+    // Não é necessário chamar Plugin::loadTranslation() pois o método não existe no GLPI 11
 
     // Registrar hooks básicos - sempre
     $PLUGIN_HOOKS['csrf_compliant']['glpipwa'] = true;

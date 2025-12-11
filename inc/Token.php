@@ -154,7 +154,7 @@ class PluginGlpipwaToken extends CommonDBTM
         
         // Se não houver IDs válidos, retornar array vazio
         if (empty($valid_users_ids)) {
-            Toolbox::logWarning("GLPI PWA: Nenhum ID de usuário válido fornecido para getUsersTokens. IDs originais: " . implode(', ', $users_ids));
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Nenhum ID de usuário válido fornecido para getUsersTokens. IDs originais: " . implode(', ', $users_ids), LOG_WARNING);
             return [];
         }
 

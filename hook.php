@@ -100,11 +100,11 @@ function plugin_glpipwa_pre_item_update($item) {
                     ];
                     
                     if (class_exists('Toolbox')) {
-                        Toolbox::logDebug("GLPI PWA: Estado anterior capturado para ticket ID: {$ticketId} - Status: {$previousStatus}, Técnico: {$previousTech}, Grupo: {$previousGroup}");
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: Estado anterior capturado para ticket ID: {$ticketId} - Status: {$previousStatus}, Técnico: {$previousTech}, Grupo: {$previousGroup}", LOG_DEBUG);
                     }
                 } else {
                     if (class_exists('Toolbox')) {
-                        Toolbox::logWarning("GLPI PWA: Não foi possível carregar ticket ID: {$ticketId} para capturar estado anterior");
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: Não foi possível carregar ticket ID: {$ticketId} para capturar estado anterior", LOG_WARNING);
                     }
                 }
             }
@@ -112,12 +112,12 @@ function plugin_glpipwa_pre_item_update($item) {
     } catch (Exception $e) {
         // Silenciosamente ignora erros para não quebrar o fluxo do GLPI
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_pre_item_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_pre_item_update - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         // Capturar também erros fatais
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_pre_item_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_pre_item_update - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -166,11 +166,11 @@ function plugin_glpipwa_item_add($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_item_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_item_add - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_item_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_item_add - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -224,11 +224,11 @@ function plugin_glpipwa_item_update($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_item_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_item_update - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_item_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_item_update - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -326,11 +326,11 @@ function plugin_glpipwa_followup_add($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_followup_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_followup_add - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_followup_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_followup_add - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -408,11 +408,11 @@ function plugin_glpipwa_ticket_user_add($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_ticket_user_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_ticket_user_add - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_ticket_user_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_ticket_user_add - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -461,11 +461,11 @@ function plugin_glpipwa_ticket_user_update($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_ticket_user_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_ticket_user_update - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_ticket_user_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_ticket_user_update - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -495,11 +495,11 @@ function plugin_glpipwa_validation_add($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_validation_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_validation_add - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_validation_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_validation_add - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -560,11 +560,11 @@ function plugin_glpipwa_validation_update($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_validation_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_validation_update - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_validation_update - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_validation_update - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -629,11 +629,11 @@ function plugin_glpipwa_task_add($item) {
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro em plugin_glpipwa_task_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro em plugin_glpipwa_task_add - " . $e->getMessage(), LOG_ERR);
         }
     } catch (Throwable $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro fatal em plugin_glpipwa_task_add - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal em plugin_glpipwa_task_add - " . $e->getMessage(), LOG_ERR);
         }
     }
 }
@@ -689,18 +689,18 @@ function plugin_glpipwa_install() {
         // Configurações padrão (apenas para chaves que não existem)
         $existing = PluginGlpipwaConfig::getAll();
         $defaults = [
-        'firebase_api_key' => '',
-        'firebase_project_id' => '',
-        'firebase_messaging_sender_id' => '',
-        'firebase_app_id' => '',
-        'firebase_vapid_key' => '',
-        'firebase_service_account_json' => '',
-        'pwa_name' => 'GLPI Service Desk',
-        'pwa_short_name' => 'GLPI',
-        'pwa_theme_color' => '#0d6efd',
-        'pwa_background_color' => '#ffffff',
-        'pwa_start_url' => '/',
-        'pwa_display' => 'standalone',
+            'firebase_api_key' => '',
+            'firebase_project_id' => '',
+            'firebase_messaging_sender_id' => '',
+            'firebase_app_id' => '',
+            'firebase_vapid_key' => '',
+            'firebase_service_account_json' => '',
+            'pwa_name' => 'GLPI Service Desk',
+            'pwa_short_name' => 'GLPI',
+            'pwa_theme_color' => '#0d6efd',
+            'pwa_background_color' => '#ffffff',
+            'pwa_start_url' => '/',
+            'pwa_display' => 'standalone',
             'pwa_orientation' => 'any',
         ];
 
@@ -725,7 +725,7 @@ function plugin_glpipwa_install() {
         return true;
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro na instalação - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro na instalação - " . $e->getMessage(), LOG_ERR);
         }
         return false;
     }
@@ -760,12 +760,12 @@ function plugin_glpipwa_uninstall() {
             PluginGlpipwaCron::uninstall();
         }
 
-    // Remover tabela de tokens usando Migration
-    $table = 'glpi_plugin_glpipwa_tokens';
-    if ($DB->tableExists($table)) {
-        $migration->displayMessage("Removendo tabela $table...");
-        $migration->dropTable($table);
-    }
+        // Remover tabela de tokens usando Migration
+        $table = 'glpi_plugin_glpipwa_tokens';
+        if ($DB->tableExists($table)) {
+            $migration->displayMessage("Removendo tabela $table...");
+            $migration->dropTable($table);
+        }
 
         // Remover configurações
         $config = new Config();
@@ -774,7 +774,7 @@ function plugin_glpipwa_uninstall() {
         return true;
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
-            Toolbox::logError("GLPI PWA: Erro na desinstalação - " . $e->getMessage());
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro na desinstalação - " . $e->getMessage(), LOG_ERR);
         }
         return false;
     }

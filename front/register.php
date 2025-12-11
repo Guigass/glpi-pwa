@@ -117,7 +117,7 @@ if (!empty($csrfToken)) {
     if (!Session::validateCSRF(['_glpi_csrf_token' => $csrfToken])) {
         // Log detalhado para debug
         if (class_exists('Toolbox')) {
-            Toolbox::logWarning('GLPIPWA: CSRF token inválido. UserID: ' . Session::getLoginUserID() . ', Token recebido: ' . substr($csrfToken, 0, 20) . '...');
+            Toolbox::logInFile('glpipwa', 'GLPIPWA: CSRF token inválido. UserID: ' . Session::getLoginUserID() . ', Token recebido: ' . substr($csrfToken, 0, 20) . '...', LOG_WARNING);
         }
         http_response_code(403);
         echo json_encode([
@@ -142,7 +142,7 @@ if (!empty($csrfToken)) {
                 }
             }
         }
-        Toolbox::logWarning('GLPIPWA: CSRF token ausente. UserID: ' . Session::getLoginUserID() . ', Method: ' . $_SERVER['REQUEST_METHOD'] . ', Headers: ' . json_encode($headersForLog));
+        Toolbox::logInFile('glpipwa', 'GLPIPWA: CSRF token ausente. UserID: ' . Session::getLoginUserID() . ', Method: ' . $_SERVER['REQUEST_METHOD'] . ', Headers: ' . json_encode($headersForLog), LOG_WARNING);
     }
     http_response_code(403);
     echo json_encode([
@@ -189,7 +189,7 @@ if (!empty($serverHost)) {
 // Isso ajuda a detectar possíveis problemas sem bloquear requisições válidas
 // de usuários autenticados
 if (!$originValidated && class_exists('Toolbox')) {
-    Toolbox::logWarning('GLPIPWA: Registro de token FCM sem validação de Origin/Referer. Host: ' . ($serverHost ?? 'N/A') . ', Origin: ' . ($origin ?? 'N/A') . ', Referer: ' . ($referer ?? 'N/A') . ', UserID: ' . Session::getLoginUserID());
+    Toolbox::logInFile('glpipwa', 'GLPIPWA: Registro de token FCM sem validação de Origin/Referer. Host: ' . ($serverHost ?? 'N/A') . ', Origin: ' . ($origin ?? 'N/A') . ', Referer: ' . ($referer ?? 'N/A') . ', UserID: ' . Session::getLoginUserID(), LOG_WARNING);
 }
 
 // Não bloquear - o usuário está autenticado, o que é suficiente para segurança
@@ -231,7 +231,7 @@ try {
         echo json_encode(['success' => false, 'error' => 'Erro ao registrar token']);
     }
 } catch (Exception $e) {
-    Toolbox::logError('GLPIPWA: Erro ao registrar token: ' . $e->getMessage());
+    Toolbox::logInFile('glpipwa', 'GLPIPWA: Erro ao registrar token: ' . $e->getMessage(), LOG_ERR);
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Erro interno do servidor']);
 }
