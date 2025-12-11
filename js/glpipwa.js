@@ -521,12 +521,41 @@
     }
 
     /**
+     * Obtém um token CSRF fresco do servidor
+     * 
+     * No GLPI 11, tokens CSRF são single-use. Precisamos obter um token novo
+     * especificamente para o registro do FCM, para não consumir o token da página.
+     */
+    function getNewCSRFToken() {
+        const pluginUrl = getPluginUrl();
+        const csrfUrl = pluginUrl + '/front/ajax/get-csrf-token.php';
+
+        return fetch(csrfUrl, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Erro ao obter token CSRF: ' + response.status);
+                }
+                return response.json();
+            })
+            .then((data) => {
+                if (data.success && data.csrf_token) {
+                    return data.csrf_token;
+                }
+                throw new Error('Token CSRF não retornado');
+            });
+    }
+
+    /**
      * Registra token FCM no servidor
      * 
-     * NOTA: Não enviamos token CSRF propositalmente!
-     * No GLPI 11, tokens CSRF são single-use. Se enviarmos e o servidor validar,
-     * o token será consumido e invalidado, causando falha em outras ações na mesma página.
-     * A autenticação de sessão (cookies) é suficiente para segurança neste endpoint.
+     * Primeiro obtém um token CSRF fresco via GET, depois usa esse token na requisição POST.
+     * Isso evita consumir o token CSRF da página, que causaria problemas em outras ações.
      */
     function registerToken(token) {
         if (!token || typeof token !== 'string' || token.length === 0) {
@@ -536,29 +565,37 @@
 
         const pluginUrl = getPluginUrl();
 
-        const data = {
-            token: token,
-            user_agent: navigator.userAgent
-        };
+        console.log('[GLPI PWA] Obtendo token CSRF para registro...');
 
-        // Preparar headers
-        const headers = {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-        };
+        // Primeiro obter token CSRF fresco
+        getNewCSRFToken()
+            .then((csrfToken) => {
+                console.log('[GLPI PWA] Token CSRF obtido, registrando token FCM...');
 
-        // Construir URL completa para garantir que o Origin seja enviado
-        const registerUrl = pluginUrl + '/front/register.php';
+                const data = {
+                    token: token,
+                    user_agent: navigator.userAgent,
+                    _glpi_csrf_token: csrfToken
+                };
 
-        console.log('[GLPI PWA] Registrando token FCM no servidor...');
+                // Preparar headers
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-Glpi-Csrf-Token': csrfToken
+                };
 
-        fetch(registerUrl, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: headers,
-            body: JSON.stringify(data)
-        })
+                // Construir URL completa para garantir que o Origin seja enviado
+                const registerUrl = pluginUrl + '/front/register.php';
+
+                return fetch(registerUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: headers,
+                    body: JSON.stringify(data)
+                });
+            })
             .then((response) => {
                 if (!response.ok) {
                     // Tentar obter detalhes do erro

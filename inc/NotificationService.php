@@ -279,7 +279,100 @@ class PluginGlpipwaNotificationService
                 }
             }
 
-            // Remover duplicatas
+            // Grupos de observadores via Group_Ticket
+            if (class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
+                try {
+                    $OBSERVER_TYPE = self::getActorTypeConstant('OBSERVER');
+                    if ($OBSERVER_TYPE === null) {
+                        $OBSERVER_TYPE = 3;
+                    }
+                    
+                    $group_ticket = new Group_Ticket();
+                    $observerGroups = $group_ticket->find([
+                        'tickets_id' => $ticketId,
+                        'type' => $OBSERVER_TYPE
+                    ]);
+                    
+                    self::log('debug', "Buscando grupos de observadores (type={$OBSERVER_TYPE}) para ticket ID: {$ticketId}, encontrados: " . count($observerGroups));
+                    
+                    foreach ($observerGroups as $groupTicket) {
+                        $group_id = $groupTicket['groups_id'] ?? null;
+                        if ($group_id > 0 && class_exists('Group')) {
+                            try {
+                                $group = new Group();
+                                if ($group->getFromDB($group_id)) {
+                                    $groupUsers = Group_User::getGroupUsers($group_id);
+                                    self::log('debug', "Grupo de observadores encontrado: group_id={$group_id}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticketId}");
+                                    foreach ($groupUsers as $user) {
+                                        $user_id = $user['id'] ?? null;
+                                        if (self::isValidUserId($user_id)) {
+                                            $recipients[] = (int)$user_id;
+                                            self::log('debug', "Usuário do grupo de observadores encontrado: user_id={$user_id} (grupo {$group_id}) para ticket ID: {$ticketId}");
+                                        }
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                self::log('warning', "Erro ao obter usuários do grupo de observadores (group_id={$group_id}): " . $e->getMessage());
+                            } catch (Throwable $e) {
+                                self::log('error', "Erro fatal ao obter usuários do grupo de observadores (group_id={$group_id}): " . $e->getMessage());
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    self::log('warning', "Erro ao obter grupos de observadores: " . $e->getMessage());
+                } catch (Throwable $e) {
+                    self::log('error', "Erro fatal ao obter grupos de observadores: " . $e->getMessage());
+                }
+            }
+
+            // Grupos atribuídos via Group_Ticket (ASSIGN)
+            if (class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
+                try {
+                    $ASSIGN_TYPE = self::getActorTypeConstant('ASSIGN');
+                    if ($ASSIGN_TYPE === null) {
+                        $ASSIGN_TYPE = 2;
+                    }
+                    
+                    $group_ticket = new Group_Ticket();
+                    $assignedGroups = $group_ticket->find([
+                        'tickets_id' => $ticketId,
+                        'type' => $ASSIGN_TYPE
+                    ]);
+                    
+                    self::log('debug', "Buscando grupos atribuídos (type={$ASSIGN_TYPE}) para ticket ID: {$ticketId}, encontrados: " . count($assignedGroups));
+                    
+                    foreach ($assignedGroups as $groupTicket) {
+                        $group_id = $groupTicket['groups_id'] ?? null;
+                        if ($group_id > 0 && class_exists('Group')) {
+                            try {
+                                $group = new Group();
+                                if ($group->getFromDB($group_id)) {
+                                    $groupUsers = Group_User::getGroupUsers($group_id);
+                                    self::log('debug', "Grupo atribuído encontrado: group_id={$group_id}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticketId}");
+                                    foreach ($groupUsers as $user) {
+                                        $user_id = $user['id'] ?? null;
+                                        if (self::isValidUserId($user_id)) {
+                                            $recipients[] = (int)$user_id;
+                                            self::log('debug', "Usuário do grupo atribuído encontrado: user_id={$user_id} (grupo {$group_id}) para ticket ID: {$ticketId}");
+                                        }
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                self::log('warning', "Erro ao obter usuários do grupo atribuído (group_id={$group_id}): " . $e->getMessage());
+                            } catch (Throwable $e) {
+                                self::log('error', "Erro fatal ao obter usuários do grupo atribuído (group_id={$group_id}): " . $e->getMessage());
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    self::log('warning', "Erro ao obter grupos atribuídos: " . $e->getMessage());
+                } catch (Throwable $e) {
+                    self::log('error', "Erro fatal ao obter grupos atribuídos: " . $e->getMessage());
+                }
+            }
+
+            // Remover duplicatas - garante que se um usuário está atribuído individualmente E pertence a um grupo,
+            // ele receberá apenas 1 notificação
             $recipients = array_unique($recipients);
             self::log('debug', "Destinatários únicos coletados antes da exclusão: " . count($recipients) . " para ticket ID: {$ticketId}");
 
@@ -365,31 +458,57 @@ class PluginGlpipwaNotificationService
     {
         switch ($eventType) {
             case 'ticket_created':
-                return sprintf(__('New Ticket #%d', 'glpipwa'), $ticketId);
+                return sprintf('Novo Chamado #%d', $ticketId);
             
             case 'ticket_updated':
-                return sprintf(__('Ticket #%d Updated', 'glpipwa'), $ticketId);
+                return sprintf('Chamado #%d Atualizado', $ticketId);
             
             case 'followup_added':
-                return sprintf(__('New interaction on Ticket #%d', 'glpipwa'), $ticketId);
+                return sprintf('Nova interação no Chamado #%d', $ticketId);
             
             case 'actor_added':
-                return sprintf(__('Ticket #%d - New participant', 'glpipwa'), $ticketId);
+                return sprintf('Chamado #%d - Novo participante', $ticketId);
             
             case 'actor_updated':
-                return sprintf(__('Ticket #%d - Participant updated', 'glpipwa'), $ticketId);
+                return sprintf('Chamado #%d - Participante atualizado', $ticketId);
             
             case 'validation_added':
-                return sprintf(__('Ticket #%d - Validation requested', 'glpipwa'), $ticketId);
+                return sprintf('Chamado #%d - Validação solicitada', $ticketId);
             
             case 'validation_updated':
-                return sprintf(__('Ticket #%d - Validation updated', 'glpipwa'), $ticketId);
+                return sprintf('Chamado #%d - Validação atualizada', $ticketId);
             
             case 'task_added':
-                return sprintf(__('Ticket #%d - New task', 'glpipwa'), $ticketId);
+                return sprintf('Chamado #%d - Nova tarefa', $ticketId);
             
             default:
-                return sprintf(__('Ticket #%d', 'glpipwa'), $ticketId);
+                return sprintf('Chamado #%d', $ticketId);
+        }
+    }
+
+    /**
+     * Sanitiza conteúdo HTML removendo tags e decodificando entidades
+     * 
+     * @param string $content Conteúdo a ser sanitizado
+     * @return string Conteúdo sanitizado
+     */
+    private static function sanitizeContent(string $content): string
+    {
+        try {
+            // Remover todas as tags HTML
+            $content = strip_tags($content);
+            // Decodificar entidades HTML (como &nbsp;, &lt;, etc.)
+            $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            // Normalizar espaços em branco (múltiplos espaços viram um só)
+            $content = preg_replace('/\s+/', ' ', $content);
+            // Remover espaços no início e fim
+            return trim($content);
+        } catch (Exception $e) {
+            // Em caso de erro, retornar conteúdo original sem tags
+            return strip_tags($content);
+        } catch (Throwable $e) {
+            // Em caso de erro fatal, retornar conteúdo original sem tags
+            return strip_tags($content);
         }
     }
 
@@ -405,54 +524,55 @@ class PluginGlpipwaNotificationService
     {
         switch ($eventType) {
             case 'ticket_created':
-                $name = $payload['ticket_name'] ?? __('Ticket', 'glpipwa');
-                $urgency = $payload['urgency_name'] ?? '';
-                if ($urgency) {
-                    return sprintf(__('Ticket opened by %s - Urgency: %s', 'glpipwa'), $name, $urgency);
+                $name = $payload['ticket_name'] ?? '';
+                if ($name) {
+                    return $name;
                 }
-                return sprintf(__('Ticket opened by %s', 'glpipwa'), $name);
+                return 'Novo chamado aberto';
             
             case 'ticket_updated':
-                return __('The ticket has been updated', 'glpipwa');
+                return 'O chamado foi atualizado';
             
             case 'followup_added':
-                $author = $payload['author_name'] ?? __('User', 'glpipwa');
+                $author = $payload['author_name'] ?? 'Usuário';
                 $content = $payload['content'] ?? '';
+                // Sanitizar conteúdo HTML antes de criar preview
+                $content = self::sanitizeContent($content);
                 $preview = !empty($content) ? substr($content, 0, 100) : '';
                 if ($preview) {
-                    return sprintf(__('%s commented: %s', 'glpipwa'), $author, $preview);
+                    return sprintf('%s comentou: %s', $author, $preview);
                 }
-                return sprintf(__('%s added a comment', 'glpipwa'), $author);
+                return sprintf('%s adicionou um comentário', $author);
             
             case 'actor_added':
-                $actorName = $payload['actor_name'] ?? __('User', 'glpipwa');
-                $actorType = $payload['actor_type'] ?? __('participant', 'glpipwa');
-                return sprintf(__('%s was added as %s', 'glpipwa'), $actorName, $actorType);
+                $actorName = $payload['actor_name'] ?? 'Usuário';
+                $actorType = $payload['actor_type'] ?? 'participante';
+                return sprintf('%s foi adicionado como %s', $actorName, $actorType);
             
             case 'actor_updated':
-                $actorName = $payload['actor_name'] ?? __('User', 'glpipwa');
-                return sprintf(__('%s participation was updated', 'glpipwa'), $actorName);
+                $actorName = $payload['actor_name'] ?? 'Usuário';
+                return sprintf('A participação de %s foi atualizada', $actorName);
             
             case 'validation_added':
-                return __('A validation was requested for this ticket', 'glpipwa');
+                return 'Uma validação foi solicitada para este chamado';
             
             case 'validation_updated':
-                $validator = $payload['validator_name'] ?? __('User', 'glpipwa');
+                $validator = $payload['validator_name'] ?? 'Usuário';
                 $status = $payload['status'] ?? 'updated';
                 if ($status === 'accepted') {
-                    return sprintf(__('Validation accepted by %s', 'glpipwa'), $validator);
+                    return sprintf('Validação aceita por %s', $validator);
                 } elseif ($status === 'refused') {
-                    return sprintf(__('Validation refused by %s', 'glpipwa'), $validator);
+                    return sprintf('Validação recusada por %s', $validator);
                 }
-                return sprintf(__('Validation updated by %s', 'glpipwa'), $validator);
+                return sprintf('Validação atualizada por %s', $validator);
             
             case 'task_added':
-                $taskName = $payload['task_name'] ?? __('Task', 'glpipwa');
-                $creator = $payload['creator_name'] ?? __('User', 'glpipwa');
-                return sprintf(__('%s added task: %s', 'glpipwa'), $creator, $taskName);
+                $taskName = $payload['task_name'] ?? 'Tarefa';
+                $creator = $payload['creator_name'] ?? 'Usuário';
+                return sprintf('%s adicionou tarefa: %s', $creator, $taskName);
             
             default:
-                return __('An event occurred on this ticket', 'glpipwa');
+                return 'Ocorreu um evento neste chamado';
         }
     }
 

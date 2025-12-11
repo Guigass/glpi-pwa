@@ -828,7 +828,100 @@ class PluginGlpipwaNotificationPush
             }
         }
 
-        // Remover duplicatas
+        // Grupos de observadores via Group_Ticket
+        if (class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
+            try {
+                $OBSERVER_TYPE = $this->getActorTypeConstant('OBSERVER');
+                if ($OBSERVER_TYPE === null) {
+                    $OBSERVER_TYPE = 3;
+                }
+                
+                $group_ticket = new Group_Ticket();
+                $observerGroups = $group_ticket->find([
+                    'tickets_id' => $ticket->getID(),
+                    'type' => $OBSERVER_TYPE
+                ]);
+                
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando grupos de observadores (type={$OBSERVER_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($observerGroups), LOG_DEBUG);
+                
+                foreach ($observerGroups as $groupTicket) {
+                    $group_id = $groupTicket['groups_id'] ?? null;
+                    if ($group_id > 0 && class_exists('Group')) {
+                        try {
+                            $group = new Group();
+                            if ($group->getFromDB($group_id)) {
+                                $groupUsers = Group_User::getGroupUsers($group_id);
+                                Toolbox::logInFile('glpipwa', "GLPI PWA: Grupo de observadores encontrado: group_id={$group_id}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticket->getID()}", LOG_DEBUG);
+                                foreach ($groupUsers as $user) {
+                                    $user_id = $user['id'] ?? null;
+                                    if ($this->isValidUserId($user_id)) {
+                                        $recipients[] = (int)$user_id;
+                                        Toolbox::logInFile('glpipwa', "GLPI PWA: Usuário do grupo de observadores encontrado: user_id={$user_id} (grupo {$group_id}) para ticket ID: {$ticket->getID()}", LOG_DEBUG);
+                                    }
+                                }
+                            }
+                        } catch (Exception $e) {
+                            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter usuários do grupo de observadores (group_id={$group_id}): " . $e->getMessage(), LOG_WARNING);
+                        } catch (Throwable $e) {
+                            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao obter usuários do grupo de observadores (group_id={$group_id}): " . $e->getMessage(), LOG_ERR);
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter grupos de observadores: " . $e->getMessage(), LOG_WARNING);
+            } catch (Throwable $e) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao obter grupos de observadores: " . $e->getMessage(), LOG_ERR);
+            }
+        }
+
+        // Grupos atribuídos via Group_Ticket (ASSIGN)
+        if (class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
+            try {
+                $ASSIGN_TYPE = $this->getActorTypeConstant('ASSIGN');
+                if ($ASSIGN_TYPE === null) {
+                    $ASSIGN_TYPE = 2;
+                }
+                
+                $group_ticket = new Group_Ticket();
+                $assignedGroups = $group_ticket->find([
+                    'tickets_id' => $ticket->getID(),
+                    'type' => $ASSIGN_TYPE
+                ]);
+                
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando grupos atribuídos (type={$ASSIGN_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($assignedGroups), LOG_DEBUG);
+                
+                foreach ($assignedGroups as $groupTicket) {
+                    $group_id = $groupTicket['groups_id'] ?? null;
+                    if ($group_id > 0 && class_exists('Group')) {
+                        try {
+                            $group = new Group();
+                            if ($group->getFromDB($group_id)) {
+                                $groupUsers = Group_User::getGroupUsers($group_id);
+                                Toolbox::logInFile('glpipwa', "GLPI PWA: Grupo atribuído encontrado: group_id={$group_id}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticket->getID()}", LOG_DEBUG);
+                                foreach ($groupUsers as $user) {
+                                    $user_id = $user['id'] ?? null;
+                                    if ($this->isValidUserId($user_id)) {
+                                        $recipients[] = (int)$user_id;
+                                        Toolbox::logInFile('glpipwa', "GLPI PWA: Usuário do grupo atribuído encontrado: user_id={$user_id} (grupo {$group_id}) para ticket ID: {$ticket->getID()}", LOG_DEBUG);
+                                    }
+                                }
+                            }
+                        } catch (Exception $e) {
+                            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter usuários do grupo atribuído (group_id={$group_id}): " . $e->getMessage(), LOG_WARNING);
+                        } catch (Throwable $e) {
+                            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao obter usuários do grupo atribuído (group_id={$group_id}): " . $e->getMessage(), LOG_ERR);
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter grupos atribuídos: " . $e->getMessage(), LOG_WARNING);
+            } catch (Throwable $e) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao obter grupos atribuídos: " . $e->getMessage(), LOG_ERR);
+            }
+        }
+
+        // Remover duplicatas - garante que se um usuário está atribuído individualmente E pertence a um grupo,
+        // ele receberá apenas 1 notificação
         $recipients = array_unique($recipients);
         
         // Se for novo ticket, remover apenas o criador real (quem registrou o chamado)

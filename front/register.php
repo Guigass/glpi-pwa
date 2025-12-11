@@ -61,17 +61,16 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit;
 }
 
-// IMPORTANTE: NÃO validamos CSRF token aqui propositalmente!
-// 
-// Motivo: No GLPI 11, tokens CSRF são single-use. Se validarmos o token aqui,
-// ele será consumido e invalidado, causando falha em outras ações na mesma página
-// (como trocar de perfil, enviar formulários, etc.).
+// Validação CSRF é feita automaticamente pelo listener do Symfony (CheckCsrfListener)
+// O JavaScript obtém um token CSRF fresco via GET antes de fazer esta requisição POST
+// Isso evita consumir o token CSRF da página, que causaria problemas em outras ações
 //
-// Segurança alternativa implementada:
-// 1. Autenticação de sessão já verificada acima (Session::getLoginUserID())
-// 2. Requisição usa credentials: 'same-origin' que garante cookies válidos
-// 3. Validação de Origin/Referer abaixo como camada adicional
-// 4. Validação rigorosa do formato do token FCM
+// Segurança implementada:
+// 1. Token CSRF validado pelo CheckCsrfListener do Symfony (antes deste código executar)
+// 2. Autenticação de sessão verificada acima (Session::getLoginUserID())
+// 3. Requisição usa credentials: 'same-origin' que garante cookies válidos
+// 4. Validação de Origin/Referer abaixo como camada adicional
+// 5. Validação rigorosa do formato do token FCM
 
 // Validar segurança: Origin/Referer
 // Como já verificamos autenticação de sessão acima, confiamos na autenticação
