@@ -30,10 +30,13 @@
  * ---------------------------------------------------------------------
  */
 
-// Permitir carregamento quando incluído pelo setup.php ou quando GLPI_ROOT está definido
-// O GLPI carrega hook.php automaticamente, mas também pode ser incluído pelo setup.php
-if (!defined('GLPI_ROOT') && !defined('PLUGIN_GLPIPWA_VERSION')) {
+if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
+}
+
+// Definir versão do plugin se ainda não estiver definida
+if (!defined('PLUGIN_GLPIPWA_VERSION')) {
+    define('PLUGIN_GLPIPWA_VERSION', '1.0.0');
 }
 
 /**
