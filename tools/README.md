@@ -85,6 +85,53 @@ Para publicar o release, execute:
   git push origin v1.0.1
 ```
 
+### create-github-release.ps1 / create-github-release.sh
+
+Script para criar release no GitHub via API do GitHub.
+
+#### Funcionalidades
+
+- Cria release no GitHub automaticamente
+- Usa conteúdo do CHANGELOG.md como descrição
+- Suporta rascunhos e pré-releases
+- Lista arquivos disponíveis para upload
+
+#### Uso
+
+**Windows (PowerShell):**
+```powershell
+# Usando variável de ambiente
+$env:GITHUB_TOKEN = "seu-token"
+.\tools\create-github-release.ps1 -Version 1.0.0
+
+# Passando token diretamente
+.\tools\create-github-release.ps1 -Version 1.0.0 -Token "seu-token"
+
+# Criar como rascunho
+.\tools\create-github-release.ps1 -Version 1.0.0 -Draft
+```
+
+**Linux/Mac (Bash):**
+```bash
+# Usando variável de ambiente
+export GITHUB_TOKEN="seu-token"
+./tools/create-github-release.sh -v 1.0.0
+
+# Passando token diretamente
+./tools/create-github-release.sh -v 1.0.0 -t "seu-token"
+```
+
+#### Obter Token do GitHub
+
+1. Acesse: https://github.com/settings/tokens
+2. Clique em "Generate new token" > "Generate new token (classic)"
+3. Dê um nome ao token (ex: "GLPI PWA Releases")
+4. Selecione o escopo `repo` ou `public_repo`
+5. Clique em "Generate token"
+6. Copie o token gerado (ele só aparece uma vez!)
+
+**Nota:** O token precisa ter permissão para criar releases no repositório.
+
 ### compile-mo-new.js / compile-mo-new.php
 
 Scripts para compilar arquivos de tradução `.po` para `.mo`.
@@ -103,11 +150,13 @@ php tools/compile-mo-new.php
 
 ```
 tools/
-├── create-release.ps1      # Script de release (Windows PowerShell)
-├── create-release.sh        # Script de release (Linux/Mac Bash)
-├── compile-mo-new.js        # Compilador de traduções (Node.js)
-├── compile-mo-new.php       # Compilador de traduções (PHP)
-└── README.md                # Este arquivo
+├── create-release.ps1           # Script de release (Windows PowerShell)
+├── create-release.sh             # Script de release (Linux/Mac Bash)
+├── create-github-release.ps1    # Script para criar release no GitHub (PowerShell)
+├── create-github-release.sh     # Script para criar release no GitHub (Bash)
+├── compile-mo-new.js            # Compilador de traduções (Node.js)
+├── compile-mo-new.php           # Compilador de traduções (PHP)
+└── README.md                     # Este arquivo
 ```
 
 ## Requisitos
@@ -117,6 +166,12 @@ tools/
 - Git instalado e configurado
 - PowerShell 5.1+ (Windows) ou Bash (Linux/Mac)
 - Acesso ao repositório git do projeto
+
+### Para create-github-release
+
+- Token de acesso pessoal do GitHub com permissão `repo` ou `public_repo`
+- PowerShell 5.1+ (Windows) ou Bash com `curl` e `jq` (Linux/Mac)
+- Conexão com internet para acessar a API do GitHub
 
 ### Para compile-mo
 
