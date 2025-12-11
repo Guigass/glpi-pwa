@@ -90,17 +90,23 @@ function plugin_glpipwa_pre_item_update($item) {
                     $previousTech = $ticket->getField('users_id_tech');
                     $previousGroup = $ticket->getField('groups_id_tech');
                     
+                    // Normalizar valores null/0 para comparação adequada
+                    $previousTechValue = ($previousTech && $previousTech > 0) ? (int)$previousTech : 0;
+                    $previousGroupValue = ($previousGroup && $previousGroup > 0) ? (int)$previousGroup : 0;
+                    
                     $GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId] = [
                         'status' => $previousStatus,
-                        'users_id_tech' => $previousTech,
-                        'groups_id_tech' => $previousGroup,
+                        'users_id_tech' => $previousTechValue,
+                        'groups_id_tech' => $previousGroupValue,
                         'urgency' => $ticket->getField('urgency'),
                         'priority' => $ticket->getField('priority'),
                         'impact' => $ticket->getField('impact'),
                     ];
                     
                     if (class_exists('Toolbox')) {
-                        Toolbox::logInFile('glpipwa', "GLPI PWA: Estado anterior capturado para ticket ID: {$ticketId} - Status: {$previousStatus}, Técnico: {$previousTech}, Grupo: {$previousGroup}", LOG_DEBUG);
+                        $techDisplay = $previousTechValue > 0 ? $previousTechValue : '0';
+                        $groupDisplay = $previousGroupValue > 0 ? $previousGroupValue : '0';
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: Estado anterior capturado para ticket ID: {$ticketId} - Status: {$previousStatus}, Técnico: {$techDisplay}, Grupo: {$groupDisplay}", LOG_DEBUG);
                     }
                 } else {
                     if (class_exists('Toolbox')) {
@@ -128,13 +134,23 @@ function plugin_glpipwa_pre_item_update($item) {
 function plugin_glpipwa_item_add($item) {
     try {
         if (!class_exists('Ticket')) {
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_add - Classe Ticket não existe", LOG_DEBUG);
+            }
             return;
         }
         
         if ($item instanceof Ticket) {
             $ticketId = $item->getID();
             if ($ticketId <= 0) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_add - Ticket ID inválido: {$ticketId}", LOG_DEBUG);
+                }
                 return;
+            }
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_add - Novo ticket criado, ID: {$ticketId}", LOG_DEBUG);
             }
             
             // Marcar ticket como recém-criado para evitar notificação de "updated" logo após
@@ -143,6 +159,9 @@ function plugin_glpipwa_item_add($item) {
             plugin_glpipwa_load_hook_classes();
             
             if (!class_exists('PluginGlpipwaNotificationService')) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_add - PluginGlpipwaNotificationService não encontrado", LOG_WARNING);
+                }
                 return;
             }
             
@@ -162,7 +181,15 @@ function plugin_glpipwa_item_add($item) {
             $creatorId = $item->getField('users_id_recipient');
             $excludeUserId = (!empty($creatorId) && is_numeric($creatorId) && (int)$creatorId > 0) ? (int)$creatorId : null;
             
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_add - Enviando notificação de ticket criado, ID: {$ticketId}, excluindo usuário: " . ($excludeUserId ?? 'nenhum'), LOG_DEBUG);
+            }
+            
             PluginGlpipwaNotificationService::notify($ticketId, 'ticket_created', $payload, $excludeUserId);
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_add - Notificação de ticket criado processada para ID: {$ticketId}", LOG_DEBUG);
+            }
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
@@ -181,13 +208,23 @@ function plugin_glpipwa_item_add($item) {
 function plugin_glpipwa_item_update($item) {
     try {
         if (!class_exists('Ticket')) {
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Classe Ticket não existe", LOG_DEBUG);
+            }
             return;
         }
         
         if ($item instanceof Ticket) {
             $ticketId = $item->getID();
             if ($ticketId <= 0) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Ticket ID inválido: {$ticketId}", LOG_DEBUG);
+                }
                 return;
+            }
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Processando atualização de ticket ID: {$ticketId}", LOG_DEBUG);
             }
             
             // Ignorar atualizações que ocorrem logo após a criação do ticket (dentro de 2 segundos)
@@ -196,6 +233,9 @@ function plugin_glpipwa_item_update($item) {
                 $timeSinceCreation = time() - $creationTime;
                 
                 if ($timeSinceCreation < 2) {
+                    if (class_exists('Toolbox')) {
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Ignorando atualização imediata de ticket ID: {$ticketId} (criado há {$timeSinceCreation}s)", LOG_DEBUG);
+                    }
                     unset($GLOBALS['plugin_glpipwa_new_tickets'][$ticketId]);
                     return;
                 }
@@ -205,6 +245,9 @@ function plugin_glpipwa_item_update($item) {
             plugin_glpipwa_load_hook_classes();
             
             if (!class_exists('PluginGlpipwaNotificationService')) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - PluginGlpipwaNotificationService não encontrado", LOG_WARNING);
+                }
                 return;
             }
             
@@ -213,14 +256,32 @@ function plugin_glpipwa_item_update($item) {
             if (isset($GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId])) {
                 $previousState = $GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId];
                 unset($GLOBALS['plugin_glpipwa_ticket_previous_state'][$ticketId]);
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Estado anterior recuperado para ticket ID: {$ticketId}: " . json_encode($previousState), LOG_DEBUG);
+                }
+            } else {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Nenhum estado anterior encontrado para ticket ID: {$ticketId}", LOG_DEBUG);
+                }
             }
             
             // Comparar mudanças - só notificar se houver mudança relevante
             if (!plugin_glpipwa_has_relevant_change($item, $previousState, $item->input ?? [])) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Nenhuma mudança relevante detectada para ticket ID: {$ticketId}", LOG_DEBUG);
+                }
                 return;
             }
             
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Mudança relevante detectada, enviando notificação para ticket ID: {$ticketId}", LOG_DEBUG);
+            }
+            
             PluginGlpipwaNotificationService::notify($ticketId, 'ticket_updated', []);
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_item_update - Notificação de atualização processada para ticket ID: {$ticketId}", LOG_DEBUG);
+            }
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
@@ -280,6 +341,9 @@ function plugin_glpipwa_has_relevant_change($ticket, $previousState, array $inpu
 function plugin_glpipwa_followup_add($item) {
     try {
         if (!class_exists('ITILFollowup')) {
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_followup_add - Classe ITILFollowup não existe", LOG_DEBUG);
+            }
             return;
         }
         
@@ -287,17 +351,30 @@ function plugin_glpipwa_followup_add($item) {
             // Verificar se é um follow-up de ticket
             $itemtype = $item->getField('itemtype');
             if ($itemtype !== 'Ticket') {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_followup_add - Item type não é Ticket: {$itemtype}", LOG_DEBUG);
+                }
                 return;
             }
             
             $ticketId = $item->getField('items_id');
             if ($ticketId <= 0) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_followup_add - Ticket ID inválido: {$ticketId}", LOG_DEBUG);
+                }
                 return;
+            }
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_followup_add - Processando follow-up para ticket ID: {$ticketId}", LOG_DEBUG);
             }
             
             plugin_glpipwa_load_hook_classes();
             
             if (!class_exists('PluginGlpipwaNotificationService')) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_followup_add - PluginGlpipwaNotificationService não encontrado", LOG_WARNING);
+                }
                 return;
             }
             
@@ -322,7 +399,15 @@ function plugin_glpipwa_followup_add($item) {
             
             $excludeUserId = (plugin_glpipwa_is_valid_user_id($authorId)) ? (int)$authorId : null;
             
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_followup_add - Enviando notificação de follow-up, ticket ID: {$ticketId}, autor: {$authorName}, excluindo usuário: " . ($excludeUserId ?? 'nenhum'), LOG_DEBUG);
+            }
+            
             PluginGlpipwaNotificationService::notify($ticketId, 'followup_added', $payload, $excludeUserId);
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_followup_add - Notificação de follow-up processada para ticket ID: {$ticketId}", LOG_DEBUG);
+            }
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {
@@ -352,18 +437,31 @@ function plugin_glpipwa_is_valid_user_id($user_id): bool
 function plugin_glpipwa_ticket_user_add($item) {
     try {
         if (!class_exists('Ticket_User')) {
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Classe Ticket_User não existe", LOG_DEBUG);
+            }
             return;
         }
         
         if ($item instanceof Ticket_User) {
             $ticketId = $item->getField('tickets_id');
             if ($ticketId <= 0) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Ticket ID inválido: {$ticketId}", LOG_DEBUG);
+                }
                 return;
+            }
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Processando adição de Ticket_User para ticket ID: {$ticketId}", LOG_DEBUG);
             }
             
             plugin_glpipwa_load_hook_classes();
             
             if (!class_exists('PluginGlpipwaNotificationService')) {
+                if (class_exists('Toolbox')) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - PluginGlpipwaNotificationService não encontrado", LOG_WARNING);
+                }
                 return;
             }
             
@@ -371,29 +469,45 @@ function plugin_glpipwa_ticket_user_add($item) {
             $userId = $item->getField('users_id');
             $type = $item->getField('type');
             
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Ticket ID: {$ticketId}, User ID: {$userId}, Type: {$type}", LOG_DEBUG);
+            }
+            
             $userName = __('User', 'glpipwa');
             if (class_exists('User') && plugin_glpipwa_is_valid_user_id($userId)) {
                 try {
                     $user = new User();
                     if ($user->getFromDB($userId)) {
                         $userName = $user->getName();
+                        if (class_exists('Toolbox')) {
+                            Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Nome do usuário obtido: {$userName}", LOG_DEBUG);
+                        }
                     }
                 } catch (Exception $e) {
-                    // Usar nome padrão
+                    if (class_exists('Toolbox')) {
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Erro ao obter nome do usuário: " . $e->getMessage(), LOG_WARNING);
+                    }
                 }
             }
             
             // Mapear tipo para nome legível
             $typeName = __('participant', 'glpipwa');
             if (class_exists('CommonITILActor')) {
+                // Usar valores numéricos diretos para evitar problemas com constantes
+                // REQUESTER = 1, ASSIGN = 2, OBSERVER = 3
+                $REQUESTER = defined('CommonITILActor::REQUESTER') ? CommonITILActor::REQUESTER : 1;
+                $ASSIGN = defined('CommonITILActor::ASSIGN') ? CommonITILActor::ASSIGN : 
+                         (defined('CommonITILActor::ASSIGNED') ? CommonITILActor::ASSIGNED : 2);
+                $OBSERVER = defined('CommonITILActor::OBSERVER') ? CommonITILActor::OBSERVER : 3;
+                
                 switch ($type) {
-                    case CommonITILActor::REQUESTER:
+                    case $REQUESTER:
                         $typeName = __('requester', 'glpipwa');
                         break;
-                    case CommonITILActor::ASSIGNED:
+                    case $ASSIGN:
                         $typeName = __('assigned technician', 'glpipwa');
                         break;
-                    case CommonITILActor::OBSERVER:
+                    case $OBSERVER:
                         $typeName = __('observer', 'glpipwa');
                         break;
                 }
@@ -404,7 +518,15 @@ function plugin_glpipwa_ticket_user_add($item) {
                 'actor_type' => $typeName,
             ];
             
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Enviando notificação para ticket ID: {$ticketId}, tipo: actor_added, payload: " . json_encode($payload), LOG_DEBUG);
+            }
+            
             PluginGlpipwaNotificationService::notify($ticketId, 'actor_added', $payload);
+            
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: plugin_glpipwa_ticket_user_add - Notificação enviada com sucesso para ticket ID: {$ticketId}", LOG_DEBUG);
+            }
         }
     } catch (Exception $e) {
         if (class_exists('Toolbox')) {

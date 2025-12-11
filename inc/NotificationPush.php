@@ -771,38 +771,60 @@ class PluginGlpipwaNotificationPush
         // Observadores via Ticket_User
         if (class_exists('Ticket_User') && class_exists('CommonITILActor')) {
             try {
+                $OBSERVER_TYPE = $this->getActorTypeConstant('OBSERVER');
+                if ($OBSERVER_TYPE === null) {
+                    $OBSERVER_TYPE = 3;
+                }
+                
                 $ticket_user = new Ticket_User();
                 $observers = $ticket_user->find([
                     'tickets_id' => $ticket->getID(),
-                    'type' => CommonITILActor::OBSERVER
+                    'type' => $OBSERVER_TYPE
                 ]);
+                
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando observadores (type={$OBSERVER_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($observers), LOG_DEBUG);
+                
                 foreach ($observers as $obs) {
                     $user_id = $obs['users_id'] ?? null;
                     if ($this->isValidUserId($user_id)) {
                         $recipients[] = (int)$user_id;
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: Observador encontrado: user_id={$user_id} para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                     }
                 }
             } catch (Exception $e) {
-                // Silenciosamente ignora erros
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter observadores: " . $e->getMessage(), LOG_WARNING);
+            } catch (Throwable $e) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao obter observadores: " . $e->getMessage(), LOG_ERR);
             }
         }
 
         // Solicitantes via Ticket_User (pode haver múltiplos)
         if (class_exists('Ticket_User') && class_exists('CommonITILActor')) {
             try {
+                $REQUESTER_TYPE = $this->getActorTypeConstant('REQUESTER');
+                if ($REQUESTER_TYPE === null) {
+                    $REQUESTER_TYPE = 1;
+                }
+                
                 $ticket_user = new Ticket_User();
                 $requesters = $ticket_user->find([
                     'tickets_id' => $ticket->getID(),
-                    'type' => CommonITILActor::REQUESTER
+                    'type' => $REQUESTER_TYPE
                 ]);
+                
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando solicitantes (type={$REQUESTER_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($requesters), LOG_DEBUG);
+                
                 foreach ($requesters as $req) {
                     $user_id = $req['users_id'] ?? null;
                     if ($this->isValidUserId($user_id)) {
                         $recipients[] = (int)$user_id;
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: Solicitante encontrado: user_id={$user_id} para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                     }
                 }
             } catch (Exception $e) {
-                // Silenciosamente ignora erros
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter solicitantes: " . $e->getMessage(), LOG_WARNING);
+            } catch (Throwable $e) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao obter solicitantes: " . $e->getMessage(), LOG_ERR);
             }
         }
 
@@ -823,7 +845,67 @@ class PluginGlpipwaNotificationPush
         }
 
         // Filtrar novamente para garantir que todos os valores são válidos
-        return $this->filterValidUserIds($recipients);
+        $finalRecipients = $this->filterValidUserIds($recipients);
+        
+        Toolbox::logInFile('glpipwa', "GLPI PWA: Total de destinatários finais para ticket ID: {$ticket->getID()}: " . count($finalRecipients) . " - IDs: " . implode(', ', $finalRecipients), LOG_DEBUG);
+        
+        return $finalRecipients;
+    }
+
+    /**
+     * Obtém o valor de uma constante de tipo de ator de forma segura
+     * 
+     * @param string $constantName Nome da constante (REQUESTER, ASSIGN, OBSERVER)
+     * @return int|null Valor da constante ou null se não existir
+     */
+    private function getActorTypeConstant(string $constantName): ?int
+    {
+        if (!class_exists('CommonITILActor')) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Classe CommonITILActor não existe, usando valores padrão", LOG_DEBUG);
+            return null;
+        }
+
+        try {
+            // Tentar diferentes variações do nome da constante
+            $constantVariations = [];
+            
+            if ($constantName === 'ASSIGN') {
+                // ASSIGN pode estar como ASSIGN ou ASSIGNED
+                $constantVariations = ['ASSIGN', 'ASSIGNED'];
+            } else {
+                $constantVariations = [$constantName];
+            }
+
+            foreach ($constantVariations as $variation) {
+                $fullConstantName = "CommonITILActor::{$variation}";
+                if (defined($fullConstantName)) {
+                    $value = constant($fullConstantName);
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: Constante {$fullConstantName} encontrada com valor: {$value}", LOG_DEBUG);
+                    return (int)$value;
+                }
+                
+                // Tentar usando reflexão como fallback
+                try {
+                    $reflection = new ReflectionClass('CommonITILActor');
+                    if ($reflection->hasConstant($variation)) {
+                        $value = $reflection->getConstant($variation);
+                        Toolbox::logInFile('glpipwa', "GLPI PWA: Constante {$variation} encontrada via reflexão com valor: {$value}", LOG_DEBUG);
+                        return (int)$value;
+                    }
+                } catch (ReflectionException $e) {
+                    // Continuar tentando
+                }
+            }
+
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Constante CommonITILActor::{$constantName} não encontrada (tentativas: " . implode(', ', $constantVariations) . ")", LOG_WARNING);
+            return null;
+        } catch (Exception $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao obter constante CommonITILActor::{$constantName}: " . $e->getMessage(), LOG_WARNING);
+            return null;
+        } catch (Throwable $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao obter constante CommonITILActor::{$constantName}: " . $e->getMessage(), LOG_ERR);
+            return null;
+        }
     }
 }
 

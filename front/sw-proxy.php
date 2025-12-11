@@ -35,13 +35,93 @@
  * Este arquivo permite que o SW controle todo o GLPI usando o header Service-Worker-Allowed
  */
 
+// Limpar qualquer output anterior ANTES de qualquer coisa
+if (ob_get_level() > 0) {
+    ob_end_clean();
+}
+ob_start();
+
+// Definir GLPI_ROOT se não estiver definido
 if (!defined('GLPI_ROOT')) {
     define('GLPI_ROOT', dirname(dirname(dirname(__DIR__))));
 }
-include(GLPI_ROOT . '/inc/includes.php');
+
+// Tentar incluir GLPI
+$glpiIncludes = GLPI_ROOT . '/inc/includes.php';
+if (!file_exists($glpiIncludes)) {
+    // Se não encontrar, tentar método alternativo
+    http_response_code(200);
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('Service-Worker-Allowed: /');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    ob_end_clean();
+    echo "// Service Worker - GLPI não encontrado\n";
+    echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
+    echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
+    exit;
+}
+
+try {
+    include($glpiIncludes);
+} catch (Exception $e) {
+    http_response_code(200);
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('Service-Worker-Allowed: /');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    ob_end_clean();
+    echo "// Service Worker - Erro ao carregar GLPI\n";
+    echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
+    echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
+    exit;
+} catch (Throwable $e) {
+    http_response_code(200);
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('Service-Worker-Allowed: /');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    ob_end_clean();
+    echo "// Service Worker - Erro fatal ao carregar GLPI\n";
+    echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
+    echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
+    exit;
+}
+
+// Carregar classes do plugin de forma segura
+if (!function_exists('plugin_glpipwa_load_classes')) {
+    $setupFile = __DIR__ . '/../setup.php';
+    if (file_exists($setupFile)) {
+        try {
+            require_once($setupFile);
+        } catch (Exception $e) {
+            // Ignorar erro silenciosamente
+        } catch (Throwable $e) {
+            // Ignorar erro fatal silenciosamente
+        }
+    }
+}
+
+if (function_exists('plugin_glpipwa_load_classes')) {
+    try {
+        plugin_glpipwa_load_classes();
+    } catch (Exception $e) {
+        // Ignorar erro silenciosamente
+    } catch (Throwable $e) {
+        // Ignorar erro fatal silenciosamente
+    }
+}
 
 // Obter configuração Firebase para injetar no SW
-$config = PluginGlpipwaConfig::getAll();
+$config = [];
+try {
+    if (class_exists('PluginGlpipwaConfig')) {
+        $config = PluginGlpipwaConfig::getAll();
+    }
+} catch (Exception $e) {
+    // Se houver erro ao obter configuração, usar valores vazios
+    $config = [];
+} catch (Throwable $e) {
+    // Erro fatal também
+    $config = [];
+}
 
 $firebaseConfig = [
     'apiKey' => $config['firebase_api_key'] ?? '',
@@ -52,15 +132,31 @@ $firebaseConfig = [
     'appId' => $config['firebase_app_id'] ?? '',
 ];
 
-$firebaseConfigJson = json_encode($firebaseConfig);
+// Garantir que o JSON seja válido e seguro para inserção no JavaScript
+// Limpar valores para garantir que são strings válidas
+foreach ($firebaseConfig as $key => $value) {
+    $firebaseConfig[$key] = (string)($value ?? '');
+}
+
+$firebaseConfigJson = json_encode($firebaseConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+if ($firebaseConfigJson === false) {
+    // Se houver erro ao gerar JSON, usar objeto vazio
+    $firebaseConfigJson = '{}';
+}
+
+// Limpar qualquer output anterior antes de enviar headers
+ob_end_clean();
+ob_start();
 
 // Headers para Service Worker
-header('Content-Type: application/javascript');
+header('Content-Type: application/javascript; charset=utf-8');
 header('Service-Worker-Allowed: /');
 header('Cache-Control: no-cache, no-store, must-revalidate');
+header('X-Content-Type-Options: nosniff');
 
 // Gerar o Service Worker com configuração injetada
-$swContent = <<<JAVASCRIPT
+try {
+    $swContent = <<<JAVASCRIPT
 /**
  * Service Worker para GLPI PWA
  * Gerencia cache offline e notificações push
@@ -87,13 +183,20 @@ if (FIREBASE_CONFIG.apiKey) {
     // Handler para mensagens em background
     messaging.onBackgroundMessage((payload) => {
         const notificationTitle = payload.notification?.title || 'GLPI';
+        
+        // Usar notification_id único se disponível, senão criar um baseado em timestamp
+        // Isso garante que cada notificação seja exibida separadamente
+        const notificationTag = payload.data?.notification_id || 
+                               `glpi-\${payload.data?.ticket_id || 'notification'}-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}`;
+        
         const notificationOptions = {
             body: payload.notification?.body || '',
             icon: payload.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
             badge: '/pics/logos/logo-GLPI-250-white.png',
             data: payload.data || {},
-            tag: payload.data?.ticket_id || 'glpi-notification',
+            tag: notificationTag, // Tag único para cada notificação
             requireInteraction: false,
+            timestamp: Date.now(), // Timestamp para ordenação
         };
 
         self.registration.showNotification(notificationTitle, notificationOptions);
@@ -145,6 +248,46 @@ function isAuthUrl(url) {
     return authPatterns.some(pattern => urlLower.includes(pattern));
 }
 
+// Função auxiliar para verificar se uma URL é um arquivo estático
+function isStaticFile(url) {
+    try {
+        const urlLower = url.toLowerCase();
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname.toLowerCase();
+    
+    // Extensões de arquivos estáticos
+    const staticExtensions = [
+        '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico',
+        '.woff', '.woff2', '.ttf', '.eot', '.otf', // Fontes
+        '.mp4', '.webm', '.mp3', '.wav', // Mídia
+        '.pdf', '.zip', '.tar', '.gz', // Documentos/Arquivos
+        '.json', '.xml', '.txt', // Dados
+        '.map' // Source maps
+    ];
+    
+    // Verificar extensão do arquivo
+    const hasStaticExtension = staticExtensions.some(ext => pathname.endsWith(ext));
+    
+    // Verificar paths comuns de arquivos estáticos
+    const staticPaths = [
+        '/pics/', '/css/', '/js/', '/lib/', '/vendor/',
+        '/public/', '/assets/', '/static/', '/dist/', '/build/',
+        '/fonts/', '/images/', '/img/', '/media/'
+    ];
+    
+    const hasStaticPath = staticPaths.some(path => pathname.includes(path));
+    
+    // Verificar se é um arquivo de plugin estático
+    const isPluginStatic = pathname.includes('/plugins/') && 
+                          (hasStaticExtension || hasStaticPath);
+    
+    return hasStaticExtension || hasStaticPath || isPluginStatic;
+    } catch (e) {
+        // Se houver erro ao processar URL, não interceptar
+        return false;
+    }
+}
+
 // Função auxiliar para verificar se uma resposta indica autenticação necessária
 function isAuthResponse(response) {
     // Não cachear respostas de redirecionamento ou erro de autenticação
@@ -166,11 +309,11 @@ function isAuthResponse(response) {
     return false;
 }
 
-// Interceptação de requisições (estratégia network-first)
+// Interceptação de requisições (APENAS arquivos estáticos)
 self.addEventListener('fetch', (event) => {
     const requestUrl = event.request.url;
     
-    // Ignorar requisições não-GET e de extensões
+    // Ignorar requisições não-GET
     if (event.request.method !== 'GET') {
         return;
     }
@@ -180,8 +323,13 @@ self.addEventListener('fetch', (event) => {
         return;
     }
     
+    // INTERCEPTAR APENAS ARQUIVOS ESTÁTICOS
+    // Deixar todas as outras requisições (PHP, AJAX, etc.) passarem direto
+    if (!isStaticFile(requestUrl)) {
+        return;
+    }
+    
     // NÃO interceptar páginas de autenticação - deixar passar direto
-    // Isso garante que cookies de sessão sejam preservados corretamente
     if (isAuthUrl(requestUrl)) {
         return;
     }
@@ -236,13 +384,19 @@ self.addEventListener('push', (event) => {
     }
 
     const title = data.notification?.title || data.title || 'GLPI';
+    
+    // Usar notification_id único se disponível, senão criar um baseado em timestamp
+    const notificationTag = data.data?.notification_id || 
+                           `glpi-\${data.data?.ticket_id || 'notification'}-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}`;
+    
     const options = {
         body: data.notification?.body || data.body || '',
         icon: data.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
         badge: '/pics/logos/logo-GLPI-250-white.png',
         data: data.data || {},
-        tag: data.data?.ticket_id || 'glpi-notification',
+        tag: notificationTag, // Tag único para cada notificação
         requireInteraction: false,
+        timestamp: Date.now(), // Timestamp para ordenação
     };
 
     event.waitUntil(
@@ -283,5 +437,32 @@ self.addEventListener('notificationclick', (event) => {
 });
 JAVASCRIPT;
 
-echo $swContent;
+    ob_end_clean();
+    echo $swContent;
+    exit;
+    
+} catch (Exception $e) {
+    // Em caso de erro, retornar um service worker mínimo que não causa problemas
+    ob_end_clean();
+    http_response_code(200);
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('Service-Worker-Allowed: /');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    echo "// Service Worker - Erro ao carregar configuração\n";
+    echo "// O Service Worker será registrado mas não funcionará até que o erro seja corrigido\n";
+    echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
+    echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
+    exit;
+} catch (Throwable $e) {
+    // Erro fatal
+    ob_end_clean();
+    http_response_code(200);
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('Service-Worker-Allowed: /');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    echo "// Service Worker - Erro fatal\n";
+    echo "self.addEventListener('install', (event) => { self.skipWaiting(); });\n";
+    echo "self.addEventListener('activate', (event) => { return self.clients.claim(); });\n";
+    exit;
+}
 

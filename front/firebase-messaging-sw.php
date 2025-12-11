@@ -75,13 +75,20 @@ if (FIREBASE_CONFIG.apiKey) {
 
     messaging.onBackgroundMessage((payload) => {
         const notificationTitle = payload.notification?.title || 'GLPI';
+        
+        // Usar notification_id único se disponível, senão criar um baseado em timestamp
+        // Isso garante que cada notificação seja exibida separadamente
+        const notificationTag = payload.data?.notification_id || 
+                               `glpi-${payload.data?.ticket_id || 'notification'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
         const notificationOptions = {
             body: payload.notification?.body || '',
             icon: payload.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
             badge: '/pics/logos/logo-GLPI-250-white.png',
             data: payload.data || {},
-            tag: payload.data?.ticket_id || 'glpi-notification',
+            tag: notificationTag, // Tag único para cada notificação
             requireInteraction: false,
+            timestamp: Date.now(), // Timestamp para ordenação
         };
 
         self.registration.showNotification(notificationTitle, notificationOptions);

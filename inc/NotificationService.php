@@ -105,12 +105,22 @@ class PluginGlpipwaNotificationService
                 'event_type' => $eventType,
                 'trace' => $e->getTraceAsString()
             ]);
+            
+            // Também logar via Toolbox para garantir visibilidade
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA NotificationService: Erro fatal ao enviar notificação: " . $e->getMessage(), LOG_ERR);
+            }
         } catch (Throwable $e) {
             self::log('error', "Erro fatal ao enviar notificação: " . $e->getMessage(), [
                 'ticket_id' => $ticketId,
                 'event_type' => $eventType,
                 'trace' => $e->getTraceAsString()
             ]);
+            
+            // Também logar via Toolbox para garantir visibilidade
+            if (class_exists('Toolbox')) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA NotificationService: Erro fatal ao enviar notificação: " . $e->getMessage(), LOG_ERR);
+            }
         }
     }
 
@@ -125,21 +135,29 @@ class PluginGlpipwaNotificationService
     {
         $recipients = [];
 
+        self::log('debug', "Iniciando coleta de destinatários para ticket ID: {$ticketId}, excluindo usuário: " . ($excludeUserId ?? 'nenhum'));
+
         if (!class_exists('Ticket')) {
+            self::log('warning', "Classe Ticket não existe");
             return $recipients;
         }
 
         try {
             $ticket = new Ticket();
             if (!$ticket->getFromDB($ticketId)) {
-                self::log('warning', "Ticket ID {$ticketId} não encontrado");
+                self::log('warning', "Ticket ID {$ticketId} não encontrado no banco de dados");
                 return $recipients;
             }
+
+            self::log('debug', "Ticket ID {$ticketId} carregado com sucesso");
 
             // Técnico designado
             $tech_id = $ticket->getField('users_id_tech');
             if (self::isValidUserId($tech_id)) {
                 $recipients[] = (int)$tech_id;
+                self::log('debug', "Técnico designado encontrado: user_id={$tech_id} para ticket ID: {$ticketId}");
+            } else {
+                self::log('debug', "Técnico designado não encontrado ou inválido (users_id_tech={$tech_id}) para ticket ID: {$ticketId}");
             }
 
             // Grupo técnico
@@ -149,90 +167,149 @@ class PluginGlpipwaNotificationService
                     $group = new Group();
                     if ($group->getFromDB($tech_group)) {
                         $groupUsers = Group_User::getGroupUsers($tech_group);
+                        self::log('debug', "Grupo técnico encontrado: group_id={$tech_group}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticketId}");
                         foreach ($groupUsers as $user) {
                             $user_id = $user['id'] ?? null;
                             if (self::isValidUserId($user_id)) {
                                 $recipients[] = (int)$user_id;
+                                self::log('debug', "Usuário do grupo técnico encontrado: user_id={$user_id} para ticket ID: {$ticketId}");
                             }
                         }
+                    } else {
+                        self::log('warning', "Grupo técnico ID {$tech_group} não encontrado no banco de dados para ticket ID: {$ticketId}");
                     }
                 } catch (Exception $e) {
-                    self::log('warning', "Erro ao obter usuários do grupo técnico: " . $e->getMessage());
+                    self::log('warning', "Erro ao obter usuários do grupo técnico (group_id={$tech_group}): " . $e->getMessage());
+                } catch (Throwable $e) {
+                    self::log('error', "Erro fatal ao obter usuários do grupo técnico (group_id={$tech_group}): " . $e->getMessage());
                 }
+            } else {
+                self::log('debug', "Grupo técnico não configurado (groups_id_tech={$tech_group}) para ticket ID: {$ticketId}");
             }
 
             // Observadores via Ticket_User
             if (class_exists('Ticket_User') && class_exists('CommonITILActor')) {
                 try {
+                    $OBSERVER_TYPE = self::getActorTypeConstant('OBSERVER');
+                    if ($OBSERVER_TYPE === null) {
+                        $OBSERVER_TYPE = 3;
+                    }
+                    
                     $ticket_user = new Ticket_User();
                     $observers = $ticket_user->find([
                         'tickets_id' => $ticketId,
-                        'type' => CommonITILActor::OBSERVER
+                        'type' => $OBSERVER_TYPE
                     ]);
+                    
+                    self::log('debug', "Buscando observadores (type={$OBSERVER_TYPE}) para ticket ID: {$ticketId}, encontrados: " . count($observers));
+                    
                     foreach ($observers as $obs) {
                         $user_id = $obs['users_id'] ?? null;
                         if (self::isValidUserId($user_id)) {
                             $recipients[] = (int)$user_id;
+                            self::log('debug', "Observador encontrado: user_id={$user_id} para ticket ID: {$ticketId}");
                         }
                     }
                 } catch (Exception $e) {
                     self::log('warning', "Erro ao obter observadores: " . $e->getMessage());
+                } catch (Throwable $e) {
+                    self::log('error', "Erro fatal ao obter observadores: " . $e->getMessage());
                 }
             }
 
             // Solicitantes via Ticket_User
             if (class_exists('Ticket_User') && class_exists('CommonITILActor')) {
                 try {
+                    $REQUESTER_TYPE = self::getActorTypeConstant('REQUESTER');
+                    if ($REQUESTER_TYPE === null) {
+                        $REQUESTER_TYPE = 1;
+                    }
+                    
                     $ticket_user = new Ticket_User();
                     $requesters = $ticket_user->find([
                         'tickets_id' => $ticketId,
-                        'type' => CommonITILActor::REQUESTER
+                        'type' => $REQUESTER_TYPE
                     ]);
+                    
+                    self::log('debug', "Buscando solicitantes (type={$REQUESTER_TYPE}) para ticket ID: {$ticketId}, encontrados: " . count($requesters));
+                    
                     foreach ($requesters as $req) {
                         $user_id = $req['users_id'] ?? null;
                         if (self::isValidUserId($user_id)) {
                             $recipients[] = (int)$user_id;
+                            self::log('debug', "Solicitante encontrado: user_id={$user_id} para ticket ID: {$ticketId}");
                         }
                     }
                 } catch (Exception $e) {
                     self::log('warning', "Erro ao obter solicitantes: " . $e->getMessage());
+                } catch (Throwable $e) {
+                    self::log('error', "Erro fatal ao obter solicitantes: " . $e->getMessage());
                 }
             }
 
-            // Técnicos via Ticket_User (ASSIGNED)
+            // Técnicos via Ticket_User (ASSIGN)
             if (class_exists('Ticket_User') && class_exists('CommonITILActor')) {
                 try {
+                    // Obter valor da constante ASSIGN com fallback seguro
+                    $ASSIGN_TYPE = self::getActorTypeConstant('ASSIGN');
+                    if ($ASSIGN_TYPE === null) {
+                        // Se não conseguir obter, usar valor numérico padrão (2)
+                        $ASSIGN_TYPE = 2;
+                    }
+                    
                     $ticket_user = new Ticket_User();
                     $assigned = $ticket_user->find([
                         'tickets_id' => $ticketId,
-                        'type' => CommonITILActor::ASSIGNED
+                        'type' => $ASSIGN_TYPE
                     ]);
+                    
+                    self::log('debug', "Buscando técnicos atribuídos (type={$ASSIGN_TYPE}) para ticket ID: {$ticketId}, encontrados: " . count($assigned));
+                    
                     foreach ($assigned as $ass) {
                         $user_id = $ass['users_id'] ?? null;
                         if (self::isValidUserId($user_id)) {
                             $recipients[] = (int)$user_id;
+                            self::log('debug', "Técnico atribuído encontrado: user_id={$user_id} para ticket ID: {$ticketId}");
                         }
                     }
                 } catch (Exception $e) {
                     self::log('warning', "Erro ao obter técnicos atribuídos: " . $e->getMessage());
+                } catch (Throwable $e) {
+                    self::log('error', "Erro fatal ao obter técnicos atribuídos: " . $e->getMessage());
                 }
             }
 
             // Remover duplicatas
             $recipients = array_unique($recipients);
+            self::log('debug', "Destinatários únicos coletados antes da exclusão: " . count($recipients) . " para ticket ID: {$ticketId}");
 
             // Remover usuário excluído se especificado
             if ($excludeUserId !== null && $excludeUserId > 0) {
+                $beforeExclusion = count($recipients);
                 $recipients = array_filter($recipients, function($id) use ($excludeUserId) {
                     return $id != $excludeUserId;
                 });
+                $afterExclusion = count($recipients);
+                if ($beforeExclusion != $afterExclusion) {
+                    self::log('debug', "Usuário excluído: user_id={$excludeUserId}, destinatários antes: {$beforeExclusion}, depois: {$afterExclusion} para ticket ID: {$ticketId}");
+                }
             }
 
             // Filtrar para garantir que todos são válidos
-            return self::filterValidUserIds($recipients);
+            $finalRecipients = self::filterValidUserIds($recipients);
+            self::log('debug', "Total de destinatários finais para ticket ID: {$ticketId}: " . count($finalRecipients) . " - IDs: " . implode(', ', $finalRecipients));
+            
+            return $finalRecipients;
 
         } catch (Exception $e) {
-            self::log('error', "Erro ao coletar destinatários: " . $e->getMessage());
+            self::log('error', "Erro ao coletar destinatários para ticket ID {$ticketId}: " . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return [];
+        } catch (Throwable $e) {
+            self::log('error', "Erro fatal ao coletar destinatários para ticket ID {$ticketId}: " . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return [];
         }
     }
@@ -247,9 +324,14 @@ class PluginGlpipwaNotificationService
      */
     private static function buildPayload(string $eventType, int $ticketId, array $additionalData = []): array
     {
+        // Gerar ID único para cada notificação (timestamp + ticket_id + event_type)
+        // Isso garante que cada notificação tenha um tag único e não substitua outras
+        $notificationId = time() . '_' . $ticketId . '_' . $eventType . '_' . mt_rand(1000, 9999);
+        
         $payload = [
             'ticket_id' => (string)$ticketId,
             'type' => $eventType,
+            'notification_id' => $notificationId, // ID único para evitar substituição de notificações
         ];
 
         // Adicionar URL do ticket se não estiver presente
@@ -265,6 +347,8 @@ class PluginGlpipwaNotificationService
                 $payload[$key] = (string)$value;
             }
         }
+
+        self::log('debug', "Payload montado para ticket ID: {$ticketId}, evento: {$eventType}, notification_id: {$notificationId}");
 
         return $payload;
     }
@@ -439,6 +523,62 @@ class PluginGlpipwaNotificationService
             }
         }
         return array_unique($valid_ids);
+    }
+
+    /**
+     * Obtém o valor de uma constante de tipo de ator de forma segura
+     * 
+     * @param string $constantName Nome da constante (REQUESTER, ASSIGN, OBSERVER)
+     * @return int|null Valor da constante ou null se não existir
+     */
+    private static function getActorTypeConstant(string $constantName): ?int
+    {
+        if (!class_exists('CommonITILActor')) {
+            self::log('debug', "Classe CommonITILActor não existe, usando valores padrão");
+            return null;
+        }
+
+        try {
+            // Tentar diferentes variações do nome da constante
+            $constantVariations = [];
+            
+            if ($constantName === 'ASSIGN') {
+                // ASSIGN pode estar como ASSIGN ou ASSIGNED
+                $constantVariations = ['ASSIGN', 'ASSIGNED'];
+            } else {
+                $constantVariations = [$constantName];
+            }
+
+            foreach ($constantVariations as $variation) {
+                $fullConstantName = "CommonITILActor::{$variation}";
+                if (defined($fullConstantName)) {
+                    $value = constant($fullConstantName);
+                    self::log('debug', "Constante {$fullConstantName} encontrada com valor: {$value}");
+                    return (int)$value;
+                }
+                
+                // Tentar usando reflexão como fallback
+                try {
+                    $reflection = new ReflectionClass('CommonITILActor');
+                    if ($reflection->hasConstant($variation)) {
+                        $value = $reflection->getConstant($variation);
+                        self::log('debug', "Constante {$variation} encontrada via reflexão com valor: {$value}");
+                        return (int)$value;
+                    }
+                } catch (ReflectionException $e) {
+                    // Continuar tentando
+                }
+            }
+
+            self::log('warning', "Constante CommonITILActor::{$constantName} não encontrada (tentativas: " . implode(', ', $constantVariations) . ")");
+            return null;
+        } catch (Exception $e) {
+            self::log('warning', "Erro ao obter constante CommonITILActor::{$constantName}: " . $e->getMessage());
+            return null;
+        } catch (Throwable $e) {
+            self::log('error', "Erro fatal ao obter constante CommonITILActor::{$constantName}: " . $e->getMessage());
+            return null;
+        }
     }
 
     /**
