@@ -44,6 +44,7 @@ function plugin_glpipwa_load_classes() {
                 __DIR__ . '/inc/Token.php',
                 __DIR__ . '/inc/FirebaseAuth.php',
                 __DIR__ . '/inc/NotificationPush.php',
+                __DIR__ . '/inc/NotificationService.php',
                 __DIR__ . '/inc/Manifest.php',
                 __DIR__ . '/inc/Icon.php',
                 __DIR__ . '/inc/Cron.php',
@@ -127,6 +128,9 @@ function plugin_init_glpipwa() {
     $PLUGIN_HOOKS['item_add']['glpipwa'] = [
         'Ticket' => 'plugin_glpipwa_item_add',
         'ITILFollowup' => 'plugin_glpipwa_followup_add',
+        'Ticket_User' => 'plugin_glpipwa_ticket_user_add',
+        'TicketValidation' => 'plugin_glpipwa_validation_add',
+        'TicketTask' => 'plugin_glpipwa_task_add',
     ];
     
     $PLUGIN_HOOKS['pre_item_update']['glpipwa'] = [
@@ -135,6 +139,8 @@ function plugin_init_glpipwa() {
     
     $PLUGIN_HOOKS['item_update']['glpipwa'] = [
         'Ticket' => 'plugin_glpipwa_item_update',
+        'Ticket_User' => 'plugin_glpipwa_ticket_user_update',
+        'TicketValidation' => 'plugin_glpipwa_validation_update',
     ];
 }
 
