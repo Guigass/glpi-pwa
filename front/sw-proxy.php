@@ -172,8 +172,8 @@ if (FIREBASE_CONFIG.apiKey) {
         
         const notificationOptions = {
             body: payload.notification?.body || '',
-            icon: payload.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
-            badge: '/pics/logos/logo-GLPI-250-white.png',
+            icon: payload.notification?.icon || '/pics/glpi.png?v1',
+            badge: '/pics/glpi.png?v1',
             data: payload.data || {},
             tag: notificationTag, // Tag único para cada notificação
             requireInteraction: false,
@@ -352,46 +352,42 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-// Recebimento de notificações push (fallback se Firebase não processar)
-self.addEventListener('push', (event) => {
-    // Se Firebase está configurado, deixar ele processar a mensagem
-    // O Firebase já processa automaticamente via onBackgroundMessage
-    // Isso evita duplicação de notificações
-    if (FIREBASE_CONFIG.apiKey && typeof firebase !== 'undefined' && firebase.messaging) {
-        // Firebase está ativo, não processar aqui para evitar duplicação
-        return;
-    }
-    
-    let data = {};
-    
-    if (event.data) {
-        try {
-            data = event.data.json();
-        } catch (e) {
-            data = { body: event.data.text() };
+// Recebimento de notificações push (fallback APENAS se Firebase não estiver configurado)
+// Se Firebase está configurado, ele processa via onBackgroundMessage acima
+// Não registrar listener push quando Firebase está ativo para evitar duplicação
+if (!FIREBASE_CONFIG.apiKey) {
+    self.addEventListener('push', (event) => {
+        let data = {};
+        
+        if (event.data) {
+            try {
+                data = event.data.json();
+            } catch (e) {
+                data = { body: event.data.text() };
+            }
         }
-    }
 
-    const title = data.notification?.title || data.title || 'GLPI';
-    
-    // Usar notification_id único se disponível, senão criar um baseado em timestamp
-    const notificationTag = data.data?.notification_id || 
-                           `glpi-\${data.data?.ticket_id || 'notification'}-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}`;
-    
-    const options = {
-        body: data.notification?.body || data.body || '',
-        icon: data.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
-        badge: '/pics/logos/logo-GLPI-250-white.png',
-        data: data.data || {},
-        tag: notificationTag, // Tag único para cada notificação
-        requireInteraction: false,
-        timestamp: Date.now(), // Timestamp para ordenação
-    };
+        const title = data.notification?.title || data.title || 'GLPI';
+        
+        // Usar notification_id único se disponível, senão criar um baseado em timestamp
+        const notificationTag = data.data?.notification_id || 
+                               `glpi-\${data.data?.ticket_id || 'notification'}-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}`;
+        
+        const options = {
+            body: data.notification?.body || data.body || '',
+            icon: data.notification?.icon || '/pics/glpi.png?v1',
+            badge: '/pics/glpi.png?v1',
+            data: data.data || {},
+            tag: notificationTag, // Tag único para cada notificação
+            requireInteraction: false,
+            timestamp: Date.now(), // Timestamp para ordenação
+        };
 
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
-});
+        event.waitUntil(
+            self.registration.showNotification(title, options)
+        );
+    });
+}
 
 // Clique em notificação
 self.addEventListener('notificationclick', (event) => {

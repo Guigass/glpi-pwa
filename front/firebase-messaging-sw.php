@@ -83,8 +83,8 @@ if (FIREBASE_CONFIG.apiKey) {
         
         const notificationOptions = {
             body: payload.notification?.body || '',
-            icon: payload.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
-            badge: '/pics/logos/logo-GLPI-250-white.png',
+            icon: payload.notification?.icon || '/pics/glpi.png?v1',
+            badge: '/pics/glpi.png?v1',
             data: payload.data || {},
             tag: notificationTag, // Tag único para cada notificação
             requireInteraction: false,

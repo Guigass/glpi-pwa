@@ -194,8 +194,8 @@ self.addEventListener('push', (event) => {
     
     const options = {
         body: data.notification?.body || data.body || '',
-        icon: data.notification?.icon || '/pics/logos/logo-GLPI-250-white.png',
-        badge: '/pics/logos/logo-GLPI-250-white.png',
+        icon: data.notification?.icon || '/pics/glpi.png?v1',
+        badge: '/pics/glpi.png?v1',
         data: data.data || {},
         tag: notificationTag, // Tag único para cada notificação
         requireInteraction: false,

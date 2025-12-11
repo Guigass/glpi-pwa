@@ -186,7 +186,7 @@
             if (payload.notification && Notification.permission === 'granted') {
                 new Notification(payload.notification.title, {
                     body: payload.notification.body,
-                    icon: payload.notification.icon || '/pics/logos/logo-GLPI-250-white.png',
+                    icon: payload.notification.icon || '/pics/glpi.png?v1',
                 });
             }
         });
