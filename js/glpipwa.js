@@ -42,7 +42,6 @@
     // Registrar Service Worker
     function registerServiceWorker() {
         if (!('serviceWorker' in navigator)) {
-            console.warn('[GLPI PWA] Service Worker não suportado');
             return;
         }
 
@@ -64,12 +63,10 @@
                 scope: '/'
             })
                 .then(function (registration) {
-                    console.log('[GLPI PWA] Service Worker registrado com sucesso');
                     // Aguardar Service Worker estar ativo antes de inicializar Firebase
                     waitForServiceWorkerActive(registration).then(function () {
                         initializeFirebase(registration);
                     }).catch(function (error) {
-                        console.warn('[GLPI PWA] Erro ao aguardar Service Worker ativo:', error);
                         // Tentar inicializar mesmo assim
                         initializeFirebase(registration);
                     });
@@ -81,12 +78,10 @@
                         scope: '/'
                     })
                         .then(function (registration) {
-                            console.log('[GLPI PWA] Service Worker registrado com sucesso (fallback)');
                             // Aguardar Service Worker estar ativo antes de inicializar Firebase
                             waitForServiceWorkerActive(registration).then(function () {
                                 initializeFirebase(registration);
                             }).catch(function (error) {
-                                console.warn('[GLPI PWA] Erro ao aguardar Service Worker ativo (fallback):', error);
                                 // Tentar inicializar mesmo assim
                                 initializeFirebase(registration);
                             });
@@ -227,54 +222,32 @@
      * Inicializa Firebase e solicita token FCM
      */
     function initializeFirebase(swRegistration) {
-        // Verificar se temos Service Worker registration
-        if (!swRegistration) {
-            console.warn('[GLPI PWA] Service Worker registration não disponível para Firebase');
-        } else {
-            // Verificar se o Service Worker está ativo
-            if (swRegistration.active && swRegistration.active.state === 'activated') {
-                console.log('[GLPI PWA] Service Worker está ativo, inicializando Firebase');
-            } else {
-                console.debug('[GLPI PWA] Service Worker ainda não está ativo, mas prosseguindo com Firebase');
-            }
-        }
-
         // Verificar se Firebase está configurado
         fetchFirebaseConfig().then((firebaseConfig) => {
             if (!firebaseConfig || !firebaseConfig.apiKey) {
                 // Firebase não configurado - silenciosamente ignora
-                console.debug('[GLPI PWA] Firebase não configurado, pulando inicialização');
                 return;
             }
-
-            console.log('[GLPI PWA] Configuração Firebase obtida, carregando SDK');
 
             // Carregar Firebase SDK compat dinamicamente
             loadFirebaseSDK().then(() => {
                 if (typeof firebase === 'undefined') {
-                    console.error('[GLPI PWA] Firebase SDK não carregado após tentativa');
+                    console.error('[GLPI PWA] Firebase SDK não carregado');
                     return;
                 }
-
-                console.log('[GLPI PWA] Firebase SDK carregado, inicializando app');
 
                 // Verificar se já foi inicializado
                 if (!firebase.apps.length) {
                     try {
                         firebase.initializeApp(firebaseConfig);
-                        console.log('[GLPI PWA] Firebase app inicializado com sucesso');
                     } catch (error) {
                         console.error('[GLPI PWA] Erro ao inicializar Firebase app:', error);
                         return;
                     }
-                } else {
-                    console.debug('[GLPI PWA] Firebase app já estava inicializado');
                 }
 
                 try {
                     const messaging = firebase.messaging();
-                    console.log('[GLPI PWA] Firebase Messaging obtido, solicitando permissão');
-
                     // Solicitar permissão e obter token (passando o service worker registration)
                     requestNotificationPermission(messaging, firebaseConfig.vapidKey, swRegistration);
                 } catch (error) {
@@ -284,7 +257,7 @@
                 console.error('[GLPI PWA] Erro ao carregar Firebase SDK:', error);
             });
         }).catch((error) => {
-            console.debug('[GLPI PWA] Erro ao obter configuração Firebase:', error);
+            // Silenciosamente ignora erros de configuração
         });
     }
 
@@ -294,47 +267,35 @@
     function requestNotificationPermission(messaging, vapidKey, swRegistration) {
         // Verificar se Notification API está disponível
         if (!('Notification' in window)) {
-            console.debug('[GLPI PWA] Notification API não suportada');
             return;
         }
 
         // Função auxiliar para obter token FCM
         // IMPORTANTE: Deve aguardar o Service Worker estar activated
         function getFCMToken() {
-            console.log('[GLPI PWA] Tentando obter token FCM...');
-
             // Verificar se temos Service Worker registration
             if (!swRegistration) {
-                console.debug('[GLPI PWA] Sem Service Worker registration, tentando obter token sem SW');
                 const tokenOptions = {
                     vapidKey: vapidKey
                 };
                 return messaging.getToken(tokenOptions)
                     .then((currentToken) => {
                         if (currentToken) {
-                            console.log('[GLPI PWA] Token FCM obtido sem Service Worker');
                             registerToken(currentToken);
                             return currentToken;
-                        } else {
-                            console.warn('[GLPI PWA] Não foi possível obter token FCM sem Service Worker');
                         }
                         return null;
                     })
                     .catch((error) => {
-                        console.error('[GLPI PWA] Erro ao obter token FCM sem SW:', error);
+                        console.error('[GLPI PWA] Erro ao obter token FCM:', error);
                         return null;
                     });
             }
 
-            console.log('[GLPI PWA] Aguardando Service Worker estar ativo...');
-
             // Aguardar Service Worker estar ativo
             return waitForServiceWorkerActive(swRegistration).then((activeRegistration) => {
-                console.log('[GLPI PWA] Service Worker está ativo, verificando pushManager...');
-
                 // Verificar se o pushManager está disponível
                 if (!activeRegistration || !activeRegistration.pushManager) {
-                    console.warn('[GLPI PWA] Service Worker não tem pushManager disponível, tentando sem serviceWorkerRegistration');
                     // Tentar sem serviceWorkerRegistration
                     const tokenOptions = {
                         vapidKey: vapidKey
@@ -342,21 +303,16 @@
                     return messaging.getToken(tokenOptions)
                         .then((currentToken) => {
                             if (currentToken) {
-                                console.log('[GLPI PWA] Token FCM obtido sem pushManager');
                                 registerToken(currentToken);
                                 return currentToken;
-                            } else {
-                                console.warn('[GLPI PWA] Não foi possível obter token FCM sem pushManager');
                             }
                             return null;
                         })
                         .catch((error) => {
-                            console.error('[GLPI PWA] Erro ao obter token FCM sem pushManager:', error);
+                            console.error('[GLPI PWA] Erro ao obter token FCM:', error);
                             return null;
                         });
                 }
-
-                console.log('[GLPI PWA] Service Worker tem pushManager, obtendo token FCM...');
 
                 // Service Worker está ativo e tem pushManager
                 const tokenOptions = {
@@ -367,17 +323,13 @@
                 return messaging.getToken(tokenOptions)
                     .then((currentToken) => {
                         if (currentToken) {
-                            console.log('[GLPI PWA] Token FCM obtido com sucesso');
                             registerToken(currentToken);
                             return currentToken;
-                        } else {
-                            console.warn('[GLPI PWA] Não foi possível obter token FCM (resposta vazia)');
-                            return null;
                         }
+                        return null;
                     })
                     .catch((error) => {
                         console.error('[GLPI PWA] Erro ao obter token FCM:', error);
-                        console.log('[GLPI PWA] Tentando obter token sem serviceWorkerRegistration como fallback...');
                         // Tentar novamente sem serviceWorkerRegistration como fallback
                         const fallbackOptions = {
                             vapidKey: vapidKey
@@ -385,11 +337,8 @@
                         return messaging.getToken(fallbackOptions)
                             .then((currentToken) => {
                                 if (currentToken) {
-                                    console.log('[GLPI PWA] Token FCM obtido com fallback (sem serviceWorkerRegistration)');
                                     registerToken(currentToken);
                                     return currentToken;
-                                } else {
-                                    console.warn('[GLPI PWA] Fallback também não retornou token');
                                 }
                                 return null;
                             })
@@ -400,7 +349,6 @@
                     });
             }).catch((error) => {
                 console.error('[GLPI PWA] Erro ao aguardar Service Worker ativo:', error);
-                console.log('[GLPI PWA] Tentando obter token mesmo sem Service Worker ativo...');
                 // Tentar obter token mesmo sem Service Worker (pode funcionar em alguns casos)
                 const tokenOptions = {
                     vapidKey: vapidKey
@@ -408,16 +356,13 @@
                 return messaging.getToken(tokenOptions)
                     .then((currentToken) => {
                         if (currentToken) {
-                            console.log('[GLPI PWA] Token FCM obtido mesmo sem SW ativo');
                             registerToken(currentToken);
                             return currentToken;
-                        } else {
-                            console.warn('[GLPI PWA] Não foi possível obter token sem SW ativo');
                         }
                         return null;
                     })
                     .catch((error) => {
-                        console.error('[GLPI PWA] Erro ao obter token sem SW ativo:', error);
+                        console.error('[GLPI PWA] Erro ao obter token:', error);
                         return null;
                     });
             });
@@ -505,14 +450,10 @@
                             getFCMToken();
                         }, 5 * 60 * 1000);
                     }
-                } else {
-                    // Permissão negada - silenciosamente ignora
-                    console.debug('[GLPI PWA] Permissão de notificação negada:', permission);
                 }
             })
             .catch((error) => {
                 // Erro ao solicitar permissão - silenciosamente ignora
-                console.debug('[GLPI PWA] Erro ao solicitar permissão:', error);
             });
 
         // Nota: Na API v9 compat, onMessage não está disponível da mesma forma
@@ -559,19 +500,15 @@
      */
     function registerToken(token) {
         if (!token || typeof token !== 'string' || token.length === 0) {
-            console.error('[GLPI PWA] Token inválido para registro:', token);
+            console.error('[GLPI PWA] Token inválido para registro');
             return;
         }
 
         const pluginUrl = getPluginUrl();
 
-        console.log('[GLPI PWA] Obtendo token CSRF para registro...');
-
         // Primeiro obter token CSRF fresco
         getNewCSRFToken()
             .then((csrfToken) => {
-                console.log('[GLPI PWA] Token CSRF obtido, registrando token FCM...');
-
                 const data = {
                     token: token,
                     user_agent: navigator.userAgent,
@@ -602,30 +539,18 @@
                     return response.json().then((errorData) => {
                         const errorMessage = errorData.error || errorData.message || response.statusText;
                         console.error('[GLPI PWA] Erro ao registrar token:', response.status, errorMessage);
-                        if (errorData.debug) {
-                            console.error('[GLPI PWA] Debug info:', errorData.debug);
-                        }
-                        if (errorData.title) {
-                            console.error('[GLPI PWA] Título do erro:', errorData.title);
-                        }
                         throw new Error(errorMessage);
                     }).catch((parseError) => {
                         // Se não conseguir parsear JSON, usar statusText
-                        console.error('[GLPI PWA] Erro ao registrar token (sem detalhes):', response.status, response.statusText);
-                        console.error('[GLPI PWA] Erro ao parsear resposta:', parseError);
+                        console.error('[GLPI PWA] Erro ao registrar token:', response.status, response.statusText);
                         throw new Error('Erro ' + response.status + ': ' + response.statusText);
                     });
                 }
                 return response.json();
             })
             .then((result) => {
-                if (result && result.success) {
-                    console.log('[GLPI PWA] Token registrado com sucesso no servidor');
-                    if (result.message) {
-                        console.log('[GLPI PWA] Mensagem do servidor:', result.message);
-                    }
-                } else {
-                    console.warn('[GLPI PWA] Resposta do servidor não indica sucesso:', result);
+                if (!result || !result.success) {
+                    console.error('[GLPI PWA] Falha ao registrar token no servidor');
                 }
             })
             .catch((error) => {

@@ -57,8 +57,6 @@ class PluginGlpipwaNotificationService
     public static function notify($ticketId, string $eventType, array $payload, ?int $excludeUserId = null): void
     {
         try {
-            self::log('debug', "Iniciando notificação para ticket ID: {$ticketId}, evento: {$eventType}");
-
             // Verificar se Firebase está configurado
             if (!class_exists('PluginGlpipwaConfig')) {
                 self::log('warning', "PluginGlpipwaConfig não encontrado");
@@ -75,11 +73,8 @@ class PluginGlpipwaNotificationService
             $recipients = self::collectTicketRecipients($ticketId, $excludeUserId);
 
             if (empty($recipients)) {
-                self::log('debug', "Nenhum destinatário encontrado para ticket ID: {$ticketId}");
                 return;
             }
-
-            self::log('debug', "Encontrados " . count($recipients) . " destinatários para ticket ID: {$ticketId}");
 
             // Montar título e corpo baseado no tipo de evento
             $title = self::buildTitle($eventType, $ticketId, $payload);
@@ -135,7 +130,6 @@ class PluginGlpipwaNotificationService
     {
         $recipients = [];
 
-        self::log('debug', "Iniciando coleta de destinatários para ticket ID: {$ticketId}, excluindo usuário: " . ($excludeUserId ?? 'nenhum'));
 
         if (!class_exists('Ticket')) {
             self::log('warning', "Classe Ticket não existe");
@@ -458,31 +452,31 @@ class PluginGlpipwaNotificationService
     {
         switch ($eventType) {
             case 'ticket_created':
-                return sprintf('Novo Chamado #%d', $ticketId);
+                return sprintf(__('New Ticket #%d', 'glpipwa'), $ticketId);
             
             case 'ticket_updated':
-                return sprintf('Chamado #%d Atualizado', $ticketId);
+                return sprintf(__('Ticket #%d Updated', 'glpipwa'), $ticketId);
             
             case 'followup_added':
-                return sprintf('Nova interação no Chamado #%d', $ticketId);
+                return sprintf(__('New interaction on Ticket #%d', 'glpipwa'), $ticketId);
             
             case 'actor_added':
-                return sprintf('Chamado #%d - Novo participante', $ticketId);
+                return sprintf(__('Ticket #%d - New participant', 'glpipwa'), $ticketId);
             
             case 'actor_updated':
-                return sprintf('Chamado #%d - Participante atualizado', $ticketId);
+                return sprintf(__('Ticket #%d - Participant updated', 'glpipwa'), $ticketId);
             
             case 'validation_added':
-                return sprintf('Chamado #%d - Validação solicitada', $ticketId);
+                return sprintf(__('Ticket #%d - Validation requested', 'glpipwa'), $ticketId);
             
             case 'validation_updated':
-                return sprintf('Chamado #%d - Validação atualizada', $ticketId);
+                return sprintf(__('Ticket #%d - Validation updated', 'glpipwa'), $ticketId);
             
             case 'task_added':
-                return sprintf('Chamado #%d - Nova tarefa', $ticketId);
+                return sprintf(__('Ticket #%d - New task', 'glpipwa'), $ticketId);
             
             default:
-                return sprintf('Chamado #%d', $ticketId);
+                return sprintf(__('Ticket #%d', 'glpipwa'), $ticketId);
         }
     }
 
@@ -528,51 +522,51 @@ class PluginGlpipwaNotificationService
                 if ($name) {
                     return $name;
                 }
-                return 'Novo chamado aberto';
+                return __('New ticket opened', 'glpipwa');
             
             case 'ticket_updated':
-                return 'O chamado foi atualizado';
+                return __('The ticket has been updated', 'glpipwa');
             
             case 'followup_added':
-                $author = $payload['author_name'] ?? 'Usuário';
+                $author = $payload['author_name'] ?? __('User', 'glpipwa');
                 $content = $payload['content'] ?? '';
                 // Sanitizar conteúdo HTML antes de criar preview
                 $content = self::sanitizeContent($content);
                 $preview = !empty($content) ? substr($content, 0, 100) : '';
                 if ($preview) {
-                    return sprintf('%s comentou: %s', $author, $preview);
+                    return sprintf(__('%s commented: %s', 'glpipwa'), $author, $preview);
                 }
-                return sprintf('%s adicionou um comentário', $author);
+                return sprintf(__('%s added a comment', 'glpipwa'), $author);
             
             case 'actor_added':
-                $actorName = $payload['actor_name'] ?? 'Usuário';
-                $actorType = $payload['actor_type'] ?? 'participante';
-                return sprintf('%s foi adicionado como %s', $actorName, $actorType);
+                $actorName = $payload['actor_name'] ?? __('User', 'glpipwa');
+                $actorType = $payload['actor_type'] ?? __('participant', 'glpipwa');
+                return sprintf(__('%s was added as %s', 'glpipwa'), $actorName, $actorType);
             
             case 'actor_updated':
-                $actorName = $payload['actor_name'] ?? 'Usuário';
-                return sprintf('A participação de %s foi atualizada', $actorName);
+                $actorName = $payload['actor_name'] ?? __('User', 'glpipwa');
+                return sprintf(__('The participation of %s was updated', 'glpipwa'), $actorName);
             
             case 'validation_added':
-                return 'Uma validação foi solicitada para este chamado';
+                return __('A validation has been requested for this ticket', 'glpipwa');
             
             case 'validation_updated':
-                $validator = $payload['validator_name'] ?? 'Usuário';
+                $validator = $payload['validator_name'] ?? __('User', 'glpipwa');
                 $status = $payload['status'] ?? 'updated';
                 if ($status === 'accepted') {
-                    return sprintf('Validação aceita por %s', $validator);
+                    return sprintf(__('Validation accepted by %s', 'glpipwa'), $validator);
                 } elseif ($status === 'refused') {
-                    return sprintf('Validação recusada por %s', $validator);
+                    return sprintf(__('Validation refused by %s', 'glpipwa'), $validator);
                 }
-                return sprintf('Validação atualizada por %s', $validator);
+                return sprintf(__('Validation updated by %s', 'glpipwa'), $validator);
             
             case 'task_added':
-                $taskName = $payload['task_name'] ?? 'Tarefa';
-                $creator = $payload['creator_name'] ?? 'Usuário';
-                return sprintf('%s adicionou tarefa: %s', $creator, $taskName);
+                $taskName = $payload['task_name'] ?? __('Task', 'glpipwa');
+                $creator = $payload['creator_name'] ?? __('User', 'glpipwa');
+                return sprintf(__('%s added task: %s', 'glpipwa'), $creator, $taskName);
             
             default:
-                return 'Ocorreu um evento neste chamado';
+                return __('An event occurred on this ticket', 'glpipwa');
         }
     }
 

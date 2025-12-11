@@ -72,12 +72,10 @@ class PluginGlpipwaNotificationPush
         $tokens = PluginGlpipwaToken::getUserTokens($users_id);
         
         if (empty($tokens)) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA: Nenhum token encontrado para o usuário ID: {$users_id}", LOG_DEBUG);
             return false;
         }
 
         $totalTokens = count($tokens);
-        Toolbox::logInFile('glpipwa', "GLPI PWA: Enviando notificação para usuário ID: {$users_id} - Total de tokens: {$totalTokens}", LOG_DEBUG);
 
         $results = [];
         $successCount = 0;
@@ -97,7 +95,6 @@ class PluginGlpipwaNotificationPush
                 
                 if ($result !== false) {
                     $successCount++;
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: Notificação enviada com sucesso para token (usuário ID: {$users_id})", LOG_DEBUG);
                 } else {
                     $failureCount++;
                     Toolbox::logInFile('glpipwa', "GLPI PWA: Falha ao enviar notificação para token (usuário ID: {$users_id})", LOG_WARNING);
@@ -108,8 +105,6 @@ class PluginGlpipwaNotificationPush
                 Toolbox::logInFile('glpipwa', "GLPI PWA: Exceção ao enviar notificação para token (usuário ID: {$users_id}): " . $e->getMessage(), LOG_ERR);
             }
         }
-
-        Toolbox::logInFile('glpipwa', "GLPI PWA: Resumo de envio para usuário ID: {$users_id} - Sucessos: {$successCount}, Falhas: {$failureCount}, Total: {$totalTokens}", LOG_DEBUG);
 
         return $results;
     }

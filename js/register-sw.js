@@ -19,18 +19,16 @@
                 initializeFirebase(registration);
             })
             .catch((error) => {
-                console.error('Erro ao registrar Service Worker:', error);
+                console.error('[GLPI PWA] Erro ao registrar Service Worker:', error);
                 // Fallback: tentar registrar sem escopo ampliado usando endpoint PHP
                 navigator.serviceWorker.register(pluginUrl + '/front/sw.php')
                     .then((registration) => {
                         initializeFirebase(registration);
                     })
                     .catch((err) => {
-                        console.error('Erro ao registrar Service Worker (fallback):', err);
+                        console.error('[GLPI PWA] Erro ao registrar Service Worker (fallback):', err);
                     });
             });
-    } else {
-        console.warn('Service Worker não suportado neste navegador');
     }
 
     /**
@@ -59,14 +57,13 @@
         // Verificar se Firebase está configurado
         fetchFirebaseConfig().then((firebaseConfig) => {
             if (!firebaseConfig || !firebaseConfig.apiKey) {
-                console.warn('Firebase não configurado');
                 return;
             }
 
             // Carregar Firebase SDK compat dinamicamente
             loadFirebaseSDK().then(() => {
                 if (typeof firebase === 'undefined') {
-                    console.error('Firebase SDK não carregado');
+                    console.error('[GLPI PWA] Firebase SDK não carregado');
                     return;
                 }
 
@@ -83,10 +80,10 @@
                 // Solicitar permissão e obter token
                 requestNotificationPermission(messaging, firebaseConfig.vapidKey);
             }).catch((error) => {
-                console.error('Erro ao carregar Firebase SDK:', error);
+                console.error('[GLPI PWA] Erro ao carregar Firebase SDK:', error);
             });
         }).catch((error) => {
-            console.error('Erro ao obter configuração Firebase:', error);
+            // Silenciosamente ignora erros de configuração
         });
     }
 
@@ -143,7 +140,6 @@
                 return response.json();
             })
             .catch((error) => {
-                console.error('Erro ao parsear configuração Firebase:', error);
                 return null;
             });
     }
@@ -154,7 +150,6 @@
     function requestNotificationPermission(messaging, vapidKey) {
         // Verificar se Notification API está disponível
         if (!('Notification' in window)) {
-            console.warn('Notification API não suportada');
             return;
         }
 
@@ -164,15 +159,11 @@
                     .then((currentToken) => {
                         if (currentToken) {
                             registerToken(currentToken);
-                        } else {
-                            console.warn('Não foi possível obter token FCM');
                         }
                     })
                     .catch((error) => {
-                        console.error('Erro ao obter token FCM:', error);
+                        console.error('[GLPI PWA] Erro ao obter token FCM:', error);
                     });
-            } else {
-                console.warn('Permissão de notificação negada');
             }
         });
 
@@ -185,7 +176,7 @@
                     }
                 })
                 .catch((error) => {
-                    console.error('Erro ao atualizar token FCM:', error);
+                    console.error('[GLPI PWA] Erro ao atualizar token FCM:', error);
                 });
         });
 
@@ -237,11 +228,11 @@
         })
             .then((response) => {
                 if (!response.ok) {
-                    console.error('Erro ao registrar token:', response.statusText);
+                    console.error('[GLPI PWA] Erro ao registrar token:', response.statusText);
                 }
             })
             .catch((error) => {
-                console.error('Erro ao registrar token:', error);
+                console.error('[GLPI PWA] Erro ao registrar token:', error);
             });
     }
 })();

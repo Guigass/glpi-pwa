@@ -192,7 +192,7 @@ self.addEventListener('install', (event) => {
                 return cache.addAll(urlsToCache);
             })
             .catch((error) => {
-                console.error('Erro ao cachear recursos:', error);
+                // Silenciosamente ignora erros de cache
             })
     );
     self.skipWaiting();

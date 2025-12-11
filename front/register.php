@@ -102,11 +102,7 @@ if (!empty($serverHost)) {
     }
 }
 
-// Log de aviso se Origin/Referer não foi validado (mas não bloquear)
-// O usuário está autenticado via sessão, o que é a principal medida de segurança
-if (!$originValidated && class_exists('Toolbox')) {
-    Toolbox::logInFile('glpipwa', 'GLPIPWA: Registro de token FCM sem validação de Origin/Referer. Host: ' . ($serverHost ?? 'N/A') . ', Origin: ' . ($origin ?? 'N/A') . ', Referer: ' . ($referer ?? 'N/A') . ', UserID: ' . Session::getLoginUserID(), LOG_DEBUG);
-}
+// Origin/Referer não validado, mas usuário está autenticado via sessão (principal medida de segurança)
 
 // Validar token FCM
 if (!isset($data['token']) || empty($data['token'])) {
