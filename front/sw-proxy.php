@@ -354,6 +354,14 @@ self.addEventListener('fetch', (event) => {
 
 // Recebimento de notificações push (fallback se Firebase não processar)
 self.addEventListener('push', (event) => {
+    // Se Firebase está configurado, deixar ele processar a mensagem
+    // O Firebase já processa automaticamente via onBackgroundMessage
+    // Isso evita duplicação de notificações
+    if (FIREBASE_CONFIG.apiKey && typeof firebase !== 'undefined' && firebase.messaging) {
+        // Firebase está ativo, não processar aqui para evitar duplicação
+        return;
+    }
+    
     let data = {};
     
     if (event.data) {
