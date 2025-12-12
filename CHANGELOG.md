@@ -5,6 +5,16 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [1.0.6] - 2025-12-11
+
+### Adicionado
+
+- Listagem dos tokens registrados
+
+### Alterado
+
+- Notificar o grupo do chamado apenas na criação e não em todos os eventos
+
 ## [1.0.5] - 2025-12-11
 
 ### Corrigido
