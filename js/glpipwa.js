@@ -299,8 +299,11 @@
 
                 // Se está instalando, aguardar statechange
                 if (registration.installing) {
-                    registration.installing.addEventListener('statechange', function () {
-                        if (registration.installing.state === 'activated') {
+                    const installingWorker = registration.installing;
+                    installingWorker.addEventListener('statechange', function (event) {
+                        // Usar event.target ou a referência capturada para evitar null
+                        const worker = event.target || installingWorker;
+                        if (worker && worker.state === 'activated') {
                             resolve(registration);
                         }
                     });
@@ -309,8 +312,11 @@
 
                 // Se está waiting, aguardar statechange
                 if (registration.waiting) {
-                    registration.waiting.addEventListener('statechange', function () {
-                        if (registration.waiting.state === 'activated') {
+                    const waitingWorker = registration.waiting;
+                    waitingWorker.addEventListener('statechange', function (event) {
+                        // Usar event.target ou a referência capturada para evitar null
+                        const worker = event.target || waitingWorker;
+                        if (worker && worker.state === 'activated') {
                             resolve(registration);
                         }
                     });
@@ -654,8 +660,10 @@
                             // Quando o SW é atualizado, aguardar novo SW estar pronto
                             const newWorker = swRegistration.installing;
                             if (newWorker) {
-                                newWorker.addEventListener('statechange', () => {
-                                    if (newWorker.state === 'activated') {
+                                newWorker.addEventListener('statechange', (event) => {
+                                    // Usar event.target ou a referência capturada para evitar null
+                                    const worker = event.target || newWorker;
+                                    if (worker && worker.state === 'activated') {
                                         // Aguardar um pouco para garantir que está totalmente ativo
                                         // Forçar refresh do token quando o SW é atualizado
                                         setTimeout(() => {
