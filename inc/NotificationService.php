@@ -70,7 +70,9 @@ class PluginGlpipwaNotificationService
             }
 
             // Coletar destinatários
-            $recipients = self::collectTicketRecipients($ticketId, $excludeUserId);
+            // Para criação de ticket, incluir grupos; para atualizações, apenas usuários individuais
+            $includeGroups = ($eventType === 'ticket_created');
+            $recipients = self::collectTicketRecipients($ticketId, $excludeUserId, $includeGroups);
 
             if (empty($recipients)) {
                 return;
@@ -124,9 +126,10 @@ class PluginGlpipwaNotificationService
      * 
      * @param int $ticketId ID do ticket
      * @param int|null $excludeUserId ID do usuário a ser excluído
+     * @param bool $includeGroups Se deve incluir usuários de grupos (true para criação, false para atualizações)
      * @return array Lista de IDs de usuários
      */
-    private static function collectTicketRecipients($ticketId, ?int $excludeUserId = null): array
+    private static function collectTicketRecipients($ticketId, ?int $excludeUserId = null, bool $includeGroups = true): array
     {
         $recipients = [];
 
@@ -154,31 +157,33 @@ class PluginGlpipwaNotificationService
                 self::log('debug', "Técnico designado não encontrado ou inválido (users_id_tech={$tech_id}) para ticket ID: {$ticketId}");
             }
 
-            // Grupo técnico
-            $tech_group = $ticket->getField('groups_id_tech');
-            if ($tech_group > 0 && class_exists('Group') && class_exists('Group_User')) {
-                try {
-                    $group = new Group();
-                    if ($group->getFromDB($tech_group)) {
-                        $groupUsers = Group_User::getGroupUsers($tech_group);
-                        self::log('debug', "Grupo técnico encontrado: group_id={$tech_group}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticketId}");
-                        foreach ($groupUsers as $user) {
-                            $user_id = $user['id'] ?? null;
-                            if (self::isValidUserId($user_id)) {
-                                $recipients[] = (int)$user_id;
-                                self::log('debug', "Usuário do grupo técnico encontrado: user_id={$user_id} para ticket ID: {$ticketId}");
+            // Grupo técnico (apenas para criação de ticket)
+            if ($includeGroups) {
+                $tech_group = $ticket->getField('groups_id_tech');
+                if ($tech_group > 0 && class_exists('Group') && class_exists('Group_User')) {
+                    try {
+                        $group = new Group();
+                        if ($group->getFromDB($tech_group)) {
+                            $groupUsers = Group_User::getGroupUsers($tech_group);
+                            self::log('debug', "Grupo técnico encontrado: group_id={$tech_group}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticketId}");
+                            foreach ($groupUsers as $user) {
+                                $user_id = $user['id'] ?? null;
+                                if (self::isValidUserId($user_id)) {
+                                    $recipients[] = (int)$user_id;
+                                    self::log('debug', "Usuário do grupo técnico encontrado: user_id={$user_id} para ticket ID: {$ticketId}");
+                                }
                             }
+                        } else {
+                            self::log('warning', "Grupo técnico ID {$tech_group} não encontrado no banco de dados para ticket ID: {$ticketId}");
                         }
-                    } else {
-                        self::log('warning', "Grupo técnico ID {$tech_group} não encontrado no banco de dados para ticket ID: {$ticketId}");
+                    } catch (Exception $e) {
+                        self::log('warning', "Erro ao obter usuários do grupo técnico (group_id={$tech_group}): " . $e->getMessage());
+                    } catch (Throwable $e) {
+                        self::log('error', "Erro fatal ao obter usuários do grupo técnico (group_id={$tech_group}): " . $e->getMessage());
                     }
-                } catch (Exception $e) {
-                    self::log('warning', "Erro ao obter usuários do grupo técnico (group_id={$tech_group}): " . $e->getMessage());
-                } catch (Throwable $e) {
-                    self::log('error', "Erro fatal ao obter usuários do grupo técnico (group_id={$tech_group}): " . $e->getMessage());
+                } else {
+                    self::log('debug', "Grupo técnico não configurado (groups_id_tech={$tech_group}) para ticket ID: {$ticketId}");
                 }
-            } else {
-                self::log('debug', "Grupo técnico não configurado (groups_id_tech={$tech_group}) para ticket ID: {$ticketId}");
             }
 
             // Observadores via Ticket_User
@@ -273,8 +278,8 @@ class PluginGlpipwaNotificationService
                 }
             }
 
-            // Grupos de observadores via Group_Ticket
-            if (class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
+            // Grupos de observadores via Group_Ticket (apenas para criação de ticket)
+            if ($includeGroups && class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
                 try {
                     $OBSERVER_TYPE = self::getActorTypeConstant('OBSERVER');
                     if ($OBSERVER_TYPE === null) {
@@ -319,8 +324,8 @@ class PluginGlpipwaNotificationService
                 }
             }
 
-            // Grupos atribuídos via Group_Ticket (ASSIGN)
-            if (class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
+            // Grupos atribuídos via Group_Ticket (ASSIGN) (apenas para criação de ticket)
+            if ($includeGroups && class_exists('Group_Ticket') && class_exists('CommonITILActor') && class_exists('Group_User')) {
                 try {
                     $ASSIGN_TYPE = self::getActorTypeConstant('ASSIGN');
                     if ($ASSIGN_TYPE === null) {

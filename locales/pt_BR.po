@@ -708,3 +708,75 @@ msgstr "Ícone 512x512: Uma extensão PHP interrompeu o envio do arquivo"
 msgid "Icon 512x512: Unknown upload error"
 msgstr "Ícone 512x512: Erro de envio desconhecido"
 
+#: front/config.form.php
+msgid "Configuration"
+msgstr "Configuração"
+
+#: front/config.form.php
+msgid "Tokens"
+msgstr "Tokens"
+
+#: front/config.form.php
+msgid "Registered Tokens"
+msgstr "Tokens Registrados"
+
+#: front/config.form.php
+msgid "No tokens registered"
+msgstr "Nenhum token registrado"
+
+#: front/config.form.php
+msgid "Remove Token"
+msgstr "Remover Token"
+
+#: front/config.form.php
+msgid "Remove All Tokens"
+msgstr "Remover Todos os Tokens"
+
+#: front/config.form.php
+msgid "Token removed successfully"
+msgstr "Token removido com sucesso"
+
+#: front/config.form.php
+msgid "All tokens removed successfully"
+msgstr "Todos os tokens removidos com sucesso"
+
+#: front/config.form.php
+msgid "Error removing token"
+msgstr "Erro ao remover token"
+
+#: front/config.form.php
+msgid "Are you sure you want to remove all tokens?"
+msgstr "Tem certeza de que deseja remover todos os tokens?"
+
+#: front/config.form.php
+msgid "User"
+msgstr "Usuário"
+
+#: front/config.form.php
+msgid "Creation Date"
+msgstr "Data de Criação"
+
+#: front/config.form.php
+msgid "Actions"
+msgstr "Ações"
+
+#: front/config.form.php
+msgid "Remove"
+msgstr "Remover"
+
+#: front/config.form.php
+msgid "Unknown"
+msgstr "Desconhecido"
+
+#: front/config.form.php
+msgid "No tokens to remove"
+msgstr "Nenhum token para remover"
+
+#: front/config.form.php
+msgid "Error loading tokens"
+msgstr "Erro ao carregar tokens"
+
+#: front/config.form.php
+msgid "Tokens will appear here when users register their devices for push notifications."
+msgstr "Os tokens aparecerão aqui quando os usuários registrarem seus dispositivos para notificações push."
+

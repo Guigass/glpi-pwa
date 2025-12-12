@@ -574,3 +574,57 @@ msgstr "Icon 512x512: A PHP extension stopped the file upload"
 msgid "Icon 512x512: Unknown upload error"
 msgstr "Icon 512x512: Unknown upload error"
 
+msgid "Configuration"
+msgstr "Configuration"
+
+msgid "Tokens"
+msgstr "Tokens"
+
+msgid "Registered Tokens"
+msgstr "Registered Tokens"
+
+msgid "No tokens registered"
+msgstr "No tokens registered"
+
+msgid "Remove Token"
+msgstr "Remove Token"
+
+msgid "Remove All Tokens"
+msgstr "Remove All Tokens"
+
+msgid "Token removed successfully"
+msgstr "Token removed successfully"
+
+msgid "All tokens removed successfully"
+msgstr "All tokens removed successfully"
+
+msgid "Error removing token"
+msgstr "Error removing token"
+
+msgid "Are you sure you want to remove all tokens?"
+msgstr "Are you sure you want to remove all tokens?"
+
+msgid "User"
+msgstr "User"
+
+msgid "Creation Date"
+msgstr "Creation Date"
+
+msgid "Actions"
+msgstr "Actions"
+
+msgid "Remove"
+msgstr "Remove"
+
+msgid "Unknown"
+msgstr "Unknown"
+
+msgid "No tokens to remove"
+msgstr "No tokens to remove"
+
+msgid "Error loading tokens"
+msgstr "Error loading tokens"
+
+msgid "Tokens will appear here when users register their devices for push notifications."
+msgstr "Tokens will appear here when users register their devices for push notifications."
+

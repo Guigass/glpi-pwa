@@ -223,5 +223,66 @@ class PluginGlpipwaToken extends CommonDBTM
 
         return $deleted;
     }
+
+    /**
+     * Obtém todos os tokens com informações completas
+     */
+    public static function getAllTokens()
+    {
+        global $DB;
+
+        $tokens = [];
+        $iterator = $DB->request([
+            'FROM' => self::getTable(),
+            'ORDER' => 'date_creation DESC',
+        ]);
+
+        foreach ($iterator as $row) {
+            $tokens[] = [
+                'id' => $row['id'],
+                'users_id' => $row['users_id'],
+                'token' => $row['token'],
+                'user_agent' => $row['user_agent'],
+                'date_creation' => $row['date_creation'],
+                'date_mod' => $row['date_mod'],
+            ];
+        }
+
+        return $tokens;
+    }
+
+    /**
+     * Remove um token por ID
+     */
+    public static function deleteTokenById($id)
+    {
+        $tokenObj = new self();
+        if ($tokenObj->getFromDB($id)) {
+            return $tokenObj->delete(['id' => $id]);
+        }
+        return false;
+    }
+
+    /**
+     * Remove todos os tokens
+     */
+    public static function deleteAllTokens()
+    {
+        global $DB;
+
+        $iterator = $DB->request([
+            'FROM' => self::getTable(),
+        ]);
+
+        $deleted = 0;
+        foreach ($iterator as $row) {
+            $token = new self();
+            if ($token->delete(['id' => $row['id']])) {
+                $deleted++;
+            }
+        }
+
+        return $deleted;
+    }
 }
 

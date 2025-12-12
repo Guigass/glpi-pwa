@@ -42,6 +42,32 @@ if (!Session::haveRight('config', UPDATE)) {
     exit;
 }
 
+// Processar remoção de token individual
+if (isset($_POST['delete_token']) && isset($_POST['token_id'])) {
+    $token_id = (int)$_POST['token_id'];
+    if ($token_id > 0) {
+        if (PluginGlpipwaToken::deleteTokenById($token_id)) {
+            Session::addMessageAfterRedirect(__('Token removed successfully', 'glpipwa'), true, INFO);
+        } else {
+            Session::addMessageAfterRedirect(__('Error removing token', 'glpipwa'), true, ERROR);
+        }
+    }
+    Html::redirect($plugin_url . '?tab=tokens');
+    exit;
+}
+
+// Processar remoção de todos os tokens
+if (isset($_POST['delete_all_tokens'])) {
+    $deleted = PluginGlpipwaToken::deleteAllTokens();
+    if ($deleted > 0) {
+        Session::addMessageAfterRedirect(__('All tokens removed successfully', 'glpipwa'), true, INFO);
+    } else {
+        Session::addMessageAfterRedirect(__('No tokens to remove', 'glpipwa'), true, INFO);
+    }
+    Html::redirect($plugin_url . '?tab=tokens');
+    exit;
+}
+
 // Processar formulário
 if (isset($_POST['update'])) {
     
@@ -185,222 +211,340 @@ if (isset($_POST['test_notification'])) {
 // Obter configurações atuais
 $config = PluginGlpipwaConfig::getAll();
 
-echo "<div class='center'>";
-echo "<form method='post' action='" . $plugin_url . "' enctype='multipart/form-data'>";
-echo "<table class='tab_cadre_fixe'>";
+// Definir aba ativa
+$active_tab = $_GET['tab'] ?? 'config';
 
-// Seção Firebase
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Firebase Configuration', 'glpipwa') . "</th></tr>";
+// Definir abas
+$tabs = [
+    'config' => __('Configuration', 'glpipwa'),
+    'tokens' => __('Tokens', 'glpipwa')
+];
 
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('API Key', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_api_key' value='" . htmlspecialchars($config['firebase_api_key'] ?? '') . "' size='60'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Project ID', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_project_id' value='" . htmlspecialchars($config['firebase_project_id'] ?? '') . "' size='60'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Messaging Sender ID', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_messaging_sender_id' value='" . htmlspecialchars($config['firebase_messaging_sender_id'] ?? '') . "' size='60'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('App ID', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_app_id' value='" . htmlspecialchars($config['firebase_app_id'] ?? '') . "' size='60'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('VAPID Key', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='firebase_vapid_key' value='" . htmlspecialchars($config['firebase_vapid_key'] ?? '') . "' size='60'></td>";
-echo "</tr>";
-
-// Seção Service Account
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Firebase Service Account (FCM v1)', 'glpipwa') . "</th></tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Service Account JSON File', 'glpipwa') . "</td>";
-echo "<td><input type='file' name='firebase_service_account_json' accept='application/json'><br>";
-echo "<small>" . __('Upload the service account JSON file from Firebase Console', 'glpipwa') . "</small></td>";
-echo "</tr>";
-
-// Seção PWA - Identidade
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Identity', 'glpipwa') . "</th></tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Application Name', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_name' value='" . htmlspecialchars($config['pwa_name'] ?? 'GLPI Service Desk') . "' size='60'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Short Name', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_short_name' value='" . htmlspecialchars($config['pwa_short_name'] ?? 'GLPI') . "' size='60'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Description', 'glpipwa') . "</td>";
-echo "<td><textarea name='pwa_description' rows='3' cols='60'>" . htmlspecialchars($config['pwa_description'] ?? '') . "</textarea></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Language', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_lang' value='" . htmlspecialchars($config['pwa_lang'] ?? 'pt-BR') . "' size='10' placeholder='pt-BR'><br>";
-echo "<small>" . __('ISO 639-1 language code (e.g., pt-BR, en-US)', 'glpipwa') . "</small></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Text Direction', 'glpipwa') . "</td>";
-echo "<td>";
-echo "<select name='pwa_dir'>";
-$directions = ['ltr' => __('Left to Right', 'glpipwa'), 'rtl' => __('Right to Left', 'glpipwa')];
-foreach ($directions as $value => $label) {
-    $selected = ($config['pwa_dir'] ?? 'ltr') === $value ? 'selected' : '';
-    echo "<option value='$value' $selected>$label</option>";
+// Exibir abas manualmente usando estrutura padrão do GLPI
+echo "<div class='center' style='margin-bottom: 10px;'>";
+echo "<table class='tab_cadre_fixe' style='margin-bottom: 0; width: 100%;'>";
+echo "<tr class='tab_bg_1'>";
+foreach ($tabs as $tab_key => $tab_label) {
+    $active_class = ($active_tab === $tab_key) ? 'tab_on' : '';
+    $tab_url = $plugin_url . '?tab=' . urlencode($tab_key);
+    echo "<th class='$active_class' style='width: 50%; text-align: center;'>";
+    echo "<a href='" . htmlspecialchars($tab_url) . "' style='display: block; padding: 10px; text-decoration: none; color: inherit;'>" . htmlspecialchars($tab_label) . "</a>";
+    echo "</th>";
 }
-echo "</select>";
-echo "</td>";
 echo "</tr>";
-
-// Seção PWA - Navegação
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Navigation', 'glpipwa') . "</th></tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Start URL', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_start_url' value='" . htmlspecialchars($config['pwa_start_url'] ?? '/index.php?from=pwa') . "' size='60'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Scope', 'glpipwa') . "</td>";
-echo "<td><input type='text' name='pwa_scope' value='" . htmlspecialchars($config['pwa_scope'] ?? '/') . "' size='60'><br>";
-echo "<small>" . __('URL scope of the PWA (usually /)', 'glpipwa') . "</small></td>";
-echo "</tr>";
-
-// Seção PWA - Aparência
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Appearance', 'glpipwa') . "</th></tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Theme Color', 'glpipwa') . "</td>";
-echo "<td><input type='color' name='pwa_theme_color' value='" . htmlspecialchars($config['pwa_theme_color'] ?? '#0d6efd') . "'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Background Color', 'glpipwa') . "</td>";
-echo "<td><input type='color' name='pwa_background_color' value='" . htmlspecialchars($config['pwa_background_color'] ?? '#ffffff') . "'></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Display Mode', 'glpipwa') . "</td>";
-echo "<td>";
-echo "<select name='pwa_display'>";
-$displays = ['standalone' => __('Standalone', 'glpipwa'), 'fullscreen' => __('Fullscreen', 'glpipwa'), 'minimal-ui' => __('Minimal UI', 'glpipwa'), 'browser' => __('Browser', 'glpipwa')];
-foreach ($displays as $value => $label) {
-    $selected = ($config['pwa_display'] ?? 'standalone') === $value ? 'selected' : '';
-    echo "<option value='$value' $selected>$label</option>";
-}
-echo "</select>";
-echo "</td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Orientation', 'glpipwa') . "</td>";
-echo "<td>";
-echo "<select name='pwa_orientation'>";
-$orientations = ['any' => __('Any', 'glpipwa'), 'portrait' => __('Portrait', 'glpipwa'), 'landscape' => __('Landscape', 'glpipwa')];
-foreach ($orientations as $value => $label) {
-    $selected = ($config['pwa_orientation'] ?? 'any') === $value ? 'selected' : '';
-    echo "<option value='$value' $selected>$label</option>";
-}
-echo "</select>";
-echo "</td>";
-echo "</tr>";
-
-// Seção Ícones
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Icons', 'glpipwa') . "</th></tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Base Icon', 'glpipwa') . "</td>";
-echo "<td><input type='file' name='icon_base' accept='image/png'><br>";
-echo "<small>" . __('Upload a square PNG icon (minimum 512x512px). All sizes will be generated automatically.', 'glpipwa') . "</small></td>";
-echo "</tr>";
-
-// Mostrar ícones disponíveis
-$available_sizes = PluginGlpipwaIcon::getAvailableSizes();
-if (!empty($available_sizes)) {
-    echo "<tr class='tab_bg_2'>";
-    echo "<td>" . __('Available Sizes', 'glpipwa') . "</td>";
-    echo "<td><small>" . __('Generated sizes', 'glpipwa') . ": " . implode(', ', $available_sizes) . "px";
-    if (PluginGlpipwaIcon::exists(512, true)) {
-        echo " (+ maskable)";
-    }
-    echo "</small></td>";
-    echo "</tr>";
-}
-
-// Seção Shortcuts
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Shortcuts', 'glpipwa') . "</th></tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Default Shortcuts', 'glpipwa') . "</td>";
-echo "<td><input type='checkbox' name='pwa_shortcuts_default_enabled' value='1' " . (($config['pwa_shortcuts_default_enabled'] ?? '1') == '1' ? 'checked' : '') . "> ";
-echo __('Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)', 'glpipwa') . "</td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Custom Shortcuts', 'glpipwa') . "</td>";
-echo "<td><textarea name='pwa_shortcuts_custom' rows='5' cols='60' placeholder='[{\"name\":\"Custom Shortcut\",\"short_name\":\"Shortcut\",\"url\":\"/front/page.php\",\"icon\":\"/path/to/icon.png\",\"icon_sizes\":\"96x96\"}]'>" . htmlspecialchars($config['pwa_shortcuts_custom'] ?? '') . "</textarea><br>";
-echo "<small>" . __('JSON array of custom shortcuts. Each shortcut must have: name, url. Optional: short_name, icon, icon_sizes', 'glpipwa') . "</small></td>";
-echo "</tr>";
-
-// Seção Avançado
-echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Advanced', 'glpipwa') . "</th></tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Categories', 'glpipwa') . "</td>";
-echo "<td>";
-$all_categories = ['productivity', 'business', 'utilities', 'collaboration', 'education', 'entertainment', 'finance', 'food', 'games', 'health', 'lifestyle', 'magazines', 'medical', 'music', 'news', 'photo', 'shopping', 'social', 'sports', 'travel', 'weather'];
-$selected_categories = !empty($config['pwa_categories']) ? json_decode($config['pwa_categories'], true) : [];
-if (!is_array($selected_categories)) {
-    $selected_categories = [];
-}
-foreach ($all_categories as $cat) {
-    $checked = in_array($cat, $selected_categories) ? 'checked' : '';
-    echo "<input type='checkbox' name='pwa_categories[]' value='$cat' $checked> " . ucfirst($cat) . "<br>";
-}
-echo "</td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Edge Side Panel Width', 'glpipwa') . "</td>";
-echo "<td><input type='number' name='pwa_edge_panel_width' value='" . htmlspecialchars($config['pwa_edge_panel_width'] ?? '420') . "' min='0' max='1000' size='10'> px<br>";
-echo "<small>" . __('Preferred width for Edge Side Panel (0 to disable)', 'glpipwa') . "</small></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Related Application URL', 'glpipwa') . "</td>";
-echo "<td><input type='url' name='pwa_related_app_url' value='" . htmlspecialchars($config['pwa_related_app_url'] ?? '') . "' size='60'><br>";
-echo "<small>" . __('URL to a related web application manifest', 'glpipwa') . "</small></td>";
-echo "</tr>";
-
-echo "<tr class='tab_bg_2'>";
-echo "<td>" . __('Prefer Related Applications', 'glpipwa') . "</td>";
-echo "<td><input type='checkbox' name='pwa_prefer_related' value='1' " . (($config['pwa_prefer_related'] ?? '0') == '1' ? 'checked' : '') . "> ";
-echo __('Prefer related applications over this PWA', 'glpipwa') . "</td>";
-echo "</tr>";
-
-// Botões
-echo "<tr class='tab_bg_2'>";
-echo "<td colspan='2' class='center'>";
-echo "<input type='submit' name='update' value='" . __('Save', 'glpipwa') . "' class='submit'>";
-echo "&nbsp;";
-echo "<input type='submit' name='test_notification' value='" . __('Send Test Notification', 'glpipwa') . "' class='submit'>";
-echo "</td>";
-echo "</tr>";
-
 echo "</table>";
-Html::closeForm();
+echo "</div>";
+
+echo "<div class='center'>";
+
+// Aba de Configurações
+if ($active_tab === 'config') {
+    echo "<form method='post' action='" . $plugin_url . "' enctype='multipart/form-data'>";
+    echo "<table class='tab_cadre_fixe'>";
+
+    // Seção Firebase
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Firebase Configuration', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('API Key', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='firebase_api_key' value='" . htmlspecialchars($config['firebase_api_key'] ?? '') . "' size='60'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Project ID', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='firebase_project_id' value='" . htmlspecialchars($config['firebase_project_id'] ?? '') . "' size='60'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Messaging Sender ID', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='firebase_messaging_sender_id' value='" . htmlspecialchars($config['firebase_messaging_sender_id'] ?? '') . "' size='60'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('App ID', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='firebase_app_id' value='" . htmlspecialchars($config['firebase_app_id'] ?? '') . "' size='60'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('VAPID Key', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='firebase_vapid_key' value='" . htmlspecialchars($config['firebase_vapid_key'] ?? '') . "' size='60'></td>";
+    echo "</tr>";
+
+    // Seção Service Account
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Firebase Service Account (FCM v1)', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Service Account JSON File', 'glpipwa') . "</td>";
+    echo "<td><input type='file' name='firebase_service_account_json' accept='application/json'><br>";
+    echo "<small>" . __('Upload the service account JSON file from Firebase Console', 'glpipwa') . "</small></td>";
+    echo "</tr>";
+
+    // Seção PWA - Identidade
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Identity', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Application Name', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='pwa_name' value='" . htmlspecialchars($config['pwa_name'] ?? 'GLPI Service Desk') . "' size='60'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Short Name', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='pwa_short_name' value='" . htmlspecialchars($config['pwa_short_name'] ?? 'GLPI') . "' size='60'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Description', 'glpipwa') . "</td>";
+    echo "<td><textarea name='pwa_description' rows='3' cols='60'>" . htmlspecialchars($config['pwa_description'] ?? '') . "</textarea></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Language', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='pwa_lang' value='" . htmlspecialchars($config['pwa_lang'] ?? 'pt-BR') . "' size='10' placeholder='pt-BR'><br>";
+    echo "<small>" . __('ISO 639-1 language code (e.g., pt-BR, en-US)', 'glpipwa') . "</small></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Text Direction', 'glpipwa') . "</td>";
+    echo "<td>";
+    echo "<select name='pwa_dir'>";
+    $directions = ['ltr' => __('Left to Right', 'glpipwa'), 'rtl' => __('Right to Left', 'glpipwa')];
+    foreach ($directions as $value => $label) {
+        $selected = ($config['pwa_dir'] ?? 'ltr') === $value ? 'selected' : '';
+        echo "<option value='$value' $selected>$label</option>";
+    }
+    echo "</select>";
+    echo "</td>";
+    echo "</tr>";
+
+    // Seção PWA - Navegação
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Navigation', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Start URL', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='pwa_start_url' value='" . htmlspecialchars($config['pwa_start_url'] ?? '/index.php?from=pwa') . "' size='60'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Scope', 'glpipwa') . "</td>";
+    echo "<td><input type='text' name='pwa_scope' value='" . htmlspecialchars($config['pwa_scope'] ?? '/') . "' size='60'><br>";
+    echo "<small>" . __('URL scope of the PWA (usually /)', 'glpipwa') . "</small></td>";
+    echo "</tr>";
+
+    // Seção PWA - Aparência
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('PWA Appearance', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Theme Color', 'glpipwa') . "</td>";
+    echo "<td><input type='color' name='pwa_theme_color' value='" . htmlspecialchars($config['pwa_theme_color'] ?? '#0d6efd') . "'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Background Color', 'glpipwa') . "</td>";
+    echo "<td><input type='color' name='pwa_background_color' value='" . htmlspecialchars($config['pwa_background_color'] ?? '#ffffff') . "'></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Display Mode', 'glpipwa') . "</td>";
+    echo "<td>";
+    echo "<select name='pwa_display'>";
+    $displays = ['standalone' => __('Standalone', 'glpipwa'), 'fullscreen' => __('Fullscreen', 'glpipwa'), 'minimal-ui' => __('Minimal UI', 'glpipwa'), 'browser' => __('Browser', 'glpipwa')];
+    foreach ($displays as $value => $label) {
+        $selected = ($config['pwa_display'] ?? 'standalone') === $value ? 'selected' : '';
+        echo "<option value='$value' $selected>$label</option>";
+    }
+    echo "</select>";
+    echo "</td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Orientation', 'glpipwa') . "</td>";
+    echo "<td>";
+    echo "<select name='pwa_orientation'>";
+    $orientations = ['any' => __('Any', 'glpipwa'), 'portrait' => __('Portrait', 'glpipwa'), 'landscape' => __('Landscape', 'glpipwa')];
+    foreach ($orientations as $value => $label) {
+        $selected = ($config['pwa_orientation'] ?? 'any') === $value ? 'selected' : '';
+        echo "<option value='$value' $selected>$label</option>";
+    }
+    echo "</select>";
+    echo "</td>";
+    echo "</tr>";
+
+    // Seção Ícones
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Icons', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Base Icon', 'glpipwa') . "</td>";
+    echo "<td><input type='file' name='icon_base' accept='image/png'><br>";
+    echo "<small>" . __('Upload a square PNG icon (minimum 512x512px). All sizes will be generated automatically.', 'glpipwa') . "</small></td>";
+    echo "</tr>";
+
+    // Mostrar ícones disponíveis
+    $available_sizes = PluginGlpipwaIcon::getAvailableSizes();
+    if (!empty($available_sizes)) {
+        echo "<tr class='tab_bg_2'>";
+        echo "<td>" . __('Available Sizes', 'glpipwa') . "</td>";
+        echo "<td><small>" . __('Generated sizes', 'glpipwa') . ": " . implode(', ', $available_sizes) . "px";
+        if (PluginGlpipwaIcon::exists(512, true)) {
+            echo " (+ maskable)";
+        }
+        echo "</small></td>";
+        echo "</tr>";
+    }
+
+    // Seção Shortcuts
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Shortcuts', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Default Shortcuts', 'glpipwa') . "</td>";
+    echo "<td><input type='checkbox' name='pwa_shortcuts_default_enabled' value='1' " . (($config['pwa_shortcuts_default_enabled'] ?? '1') == '1' ? 'checked' : '') . "> ";
+    echo __('Enable default GLPI shortcuts (New Ticket, My Tickets, Knowledge Base)', 'glpipwa') . "</td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Custom Shortcuts', 'glpipwa') . "</td>";
+    echo "<td><textarea name='pwa_shortcuts_custom' rows='5' cols='60' placeholder='[{\"name\":\"Custom Shortcut\",\"short_name\":\"Shortcut\",\"url\":\"/front/page.php\",\"icon\":\"/path/to/icon.png\",\"icon_sizes\":\"96x96\"}]'>" . htmlspecialchars($config['pwa_shortcuts_custom'] ?? '') . "</textarea><br>";
+    echo "<small>" . __('JSON array of custom shortcuts. Each shortcut must have: name, url. Optional: short_name, icon, icon_sizes', 'glpipwa') . "</small></td>";
+    echo "</tr>";
+
+    // Seção Avançado
+    echo "<tr class='tab_bg_1'><th colspan='2'>" . __('Advanced', 'glpipwa') . "</th></tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Categories', 'glpipwa') . "</td>";
+    echo "<td>";
+    $all_categories = ['productivity', 'business', 'utilities', 'collaboration', 'education', 'entertainment', 'finance', 'food', 'games', 'health', 'lifestyle', 'magazines', 'medical', 'music', 'news', 'photo', 'shopping', 'social', 'sports', 'travel', 'weather'];
+    $selected_categories = !empty($config['pwa_categories']) ? json_decode($config['pwa_categories'], true) : [];
+    if (!is_array($selected_categories)) {
+        $selected_categories = [];
+    }
+    foreach ($all_categories as $cat) {
+        $checked = in_array($cat, $selected_categories) ? 'checked' : '';
+        echo "<input type='checkbox' name='pwa_categories[]' value='$cat' $checked> " . ucfirst($cat) . "<br>";
+    }
+    echo "</td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Edge Side Panel Width', 'glpipwa') . "</td>";
+    echo "<td><input type='number' name='pwa_edge_panel_width' value='" . htmlspecialchars($config['pwa_edge_panel_width'] ?? '420') . "' min='0' max='1000' size='10'> px<br>";
+    echo "<small>" . __('Preferred width for Edge Side Panel (0 to disable)', 'glpipwa') . "</small></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Related Application URL', 'glpipwa') . "</td>";
+    echo "<td><input type='url' name='pwa_related_app_url' value='" . htmlspecialchars($config['pwa_related_app_url'] ?? '') . "' size='60'><br>";
+    echo "<small>" . __('URL to a related web application manifest', 'glpipwa') . "</small></td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_2'>";
+    echo "<td>" . __('Prefer Related Applications', 'glpipwa') . "</td>";
+    echo "<td><input type='checkbox' name='pwa_prefer_related' value='1' " . (($config['pwa_prefer_related'] ?? '0') == '1' ? 'checked' : '') . "> ";
+    echo __('Prefer related applications over this PWA', 'glpipwa') . "</td>";
+    echo "</tr>";
+
+    // Botões
+    echo "<tr class='tab_bg_2'>";
+    echo "<td colspan='2' class='center'>";
+    echo "<input type='submit' name='update' value='" . __('Save', 'glpipwa') . "' class='submit'>";
+    echo "&nbsp;";
+    echo "<input type='submit' name='test_notification' value='" . __('Send Test Notification', 'glpipwa') . "' class='submit'>";
+    echo "</td>";
+    echo "</tr>";
+
+    echo "</table>";
+    Html::closeForm();
+}
+
+// Aba de Tokens
+if ($active_tab === 'tokens') {
+    try {
+        $tokens = PluginGlpipwaToken::getAllTokens();
+    } catch (Exception $e) {
+        $tokens = [];
+        Session::addMessageAfterRedirect(__('Error loading tokens', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+    } catch (Throwable $e) {
+        $tokens = [];
+        Session::addMessageAfterRedirect(__('Error loading tokens', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+    }
+    
+    echo "<table class='tab_cadre_fixe'>";
+    echo "<tr class='tab_bg_1'><th colspan='6'>" . __('Registered Tokens', 'glpipwa') . "</th></tr>";
+    
+    if (empty($tokens) || !is_array($tokens)) {
+        echo "<tr class='tab_bg_2'>";
+        echo "<td colspan='6' class='center' style='padding: 20px;'>";
+        echo "<strong>" . __('No tokens registered', 'glpipwa') . "</strong><br>";
+        echo "<small>" . __('Tokens will appear here when users register their devices for push notifications.', 'glpipwa') . "</small>";
+        echo "</td>";
+        echo "</tr>";
+    } else {
+        // Botão remover todos
+        echo "<tr class='tab_bg_2'>";
+        echo "<td colspan='6' class='center'>";
+        echo "<form method='post' action='" . $plugin_url . "?tab=tokens' style='display:inline;'>";
+        echo "<input type='hidden' name='delete_all_tokens' value='1'>";
+        echo "<input type='submit' value='" . __('Remove All Tokens', 'glpipwa') . "' class='submit' onclick=\"return confirm('" . __('Are you sure you want to remove all tokens?', 'glpipwa') . "');\">";
+        echo "</form>";
+        echo "</td>";
+        echo "</tr>";
+        
+        // Cabeçalho da tabela
+        echo "<tr class='tab_bg_1'>";
+        echo "<th>" . __('ID', 'glpipwa') . "</th>";
+        echo "<th>" . __('User', 'glpipwa') . "</th>";
+        echo "<th>" . __('Token', 'glpipwa') . "</th>";
+        echo "<th>" . __('Creation Date', 'glpipwa') . "</th>";
+        echo "<th>" . __('User Agent', 'glpipwa') . "</th>";
+        echo "<th>" . __('Actions', 'glpipwa') . "</th>";
+        echo "</tr>";
+        
+        // Listar tokens
+        foreach ($tokens as $token_data) {
+            $token_id = $token_data['id'];
+            $users_id = $token_data['users_id'];
+            $token = $token_data['token'];
+            $user_agent = $token_data['user_agent'] ?? '';
+            $date_creation = $token_data['date_creation'] ?? '';
+            
+            // Formatar token (primeiros 10 e últimos 10 caracteres)
+            $token_length = strlen($token);
+            if ($token_length > 20) {
+                $formatted_token = substr($token, 0, 10) . '...' . substr($token, -10);
+            } else {
+                $formatted_token = $token;
+            }
+            
+            // Obter nome do usuário
+            $user_name = User::getFriendlyNameById($users_id);
+            if (empty($user_name)) {
+                $user_name = __('Unknown', 'glpipwa') . " (ID: $users_id)";
+            }
+            
+            // Formatar data
+            $formatted_date = '';
+            if (!empty($date_creation)) {
+                $formatted_date = Html::convDateTime($date_creation);
+            }
+            
+            echo "<tr class='tab_bg_2'>";
+            echo "<td>$token_id</td>";
+            echo "<td>" . htmlspecialchars($user_name) . "</td>";
+            echo "<td><code>" . htmlspecialchars($formatted_token) . "</code></td>";
+            echo "<td>$formatted_date</td>";
+            echo "<td>" . htmlspecialchars($user_agent) . "</td>";
+            echo "<td class='center'>";
+            echo "<form method='post' action='" . $plugin_url . "?tab=tokens' style='display:inline;'>";
+            echo "<input type='hidden' name='token_id' value='$token_id'>";
+            echo "<input type='submit' name='delete_token' value='" . __('Remove', 'glpipwa') . "' class='submit'>";
+            echo "</form>";
+            echo "</td>";
+            echo "</tr>";
+        }
+    }
+    
+    echo "</table>";
+}
+
 echo "</div>";
 
 Html::footer();
-
