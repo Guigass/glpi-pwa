@@ -263,21 +263,16 @@
     }
 
     /**
-     * Verifica se deve registrar o token FCM baseado no tipo de dispositivo e modo de execução
+     * Verifica se deve registrar o token FCM baseado no modo de execução
      * 
-     * Regras:
-     * - Desktop: sempre registra
-     * - Mobile no navegador: não registra
-     * - Mobile no PWA: registra
+     * Regra unificada:
+     * - Registra apenas se o PWA estiver instalado (mobile ou desktop)
+     * - Não registra quando executando no navegador normal
      * 
      * @return {boolean} true se deve registrar, false caso contrário
      */
     function shouldRegisterToken() {
-        // Desktop sempre registra
-        if (!isMobile()) {
-            return true;
-        }
-        // Mobile só registra se for PWA
+        // Registra apenas se estiver rodando como PWA instalado
         return isPWA();
     }
 
@@ -416,25 +411,23 @@
 
                 try {
                     const storedState = localStorage.getItem(registrationStateKey);
-                    // storedState contém: "registered|isMobile|isPWA" ou null
-                    // Exemplo: "registered|1|0" significa: registrado quando era mobile não-PWA
+                    // storedState contém: "registered|isPWA" ou null
+                    // Exemplo: "registered|1" significa: registrado quando era PWA
                     const storedParts = storedState ? storedState.split('|') : [];
                     const wasRegistered = storedParts[0] === 'registered';
-                    const storedIsMobile = storedParts[1] === '1';
-                    const storedIsPWA = storedParts[2] === '1';
+                    const storedIsPWA = storedParts[1] === '1';
 
                     // Verificar se as condições atuais requerem registro
-                    const currentIsMobile = isMobile();
                     const currentIsPWA = isPWA();
-                    const conditionsChanged = storedIsMobile !== currentIsMobile || storedIsPWA !== currentIsPWA;
+                    const conditionsChanged = storedIsPWA !== currentIsPWA;
 
                     if (shouldRegister) {
                         // Deve registrar: verificar se precisa fazer registro
                         if (!wasRegistered || conditionsChanged) {
-                            // Nunca foi registrado ou condições mudaram - registrar
+                            // Nunca foi registrado ou condições mudaram (instalou/desinstalou PWA) - registrar
                             registerToken(token);
-                            // Armazenar estado atual
-                            const newState = 'registered|' + (currentIsMobile ? '1' : '0') + '|' + (currentIsPWA ? '1' : '0');
+                            // Armazenar estado atual (só precisa saber se é PWA)
+                            const newState = 'registered|' + (currentIsPWA ? '1' : '0');
                             localStorage.setItem(registrationStateKey, newState);
                         }
                         // Se já estava registrado e condições não mudaram, não precisa fazer nada

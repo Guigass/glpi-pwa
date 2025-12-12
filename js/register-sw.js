@@ -177,21 +177,16 @@
     }
 
     /**
-     * Verifica se deve registrar o token FCM baseado no tipo de dispositivo e modo de execução
+     * Verifica se deve registrar o token FCM baseado no modo de execução
      * 
-     * Regras:
-     * - Desktop: sempre registra
-     * - Mobile no navegador: não registra
-     * - Mobile no PWA: registra
+     * Regra unificada:
+     * - Registra apenas se o PWA estiver instalado (mobile ou desktop)
+     * - Não registra quando executando no navegador normal
      * 
      * @return {boolean} true se deve registrar, false caso contrário
      */
     function shouldRegisterToken() {
-        // Desktop sempre registra
-        if (!isMobile()) {
-            return true;
-        }
-        // Mobile só registra se for PWA
+        // Registra apenas se estiver rodando como PWA instalado
         return isPWA();
     }
 
