@@ -145,6 +145,57 @@
     }
 
     /**
+     * Verifica se o dispositivo está rodando como PWA instalado
+     * 
+     * @return {boolean} true se está rodando como PWA, false caso contrário
+     */
+    function isPWA() {
+        // Android/Chrome/Edge - verificar display-mode standalone ou fullscreen
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+            return true;
+        }
+        if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) {
+            return true;
+        }
+        // iOS Safari - verificar navigator.standalone
+        if (window.navigator.standalone === true) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Verifica se o dispositivo é mobile
+     * 
+     * @return {boolean} true se é mobile, false caso contrário
+     */
+    function isMobile() {
+        const ua = navigator.userAgent.toLowerCase();
+        const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+        // Verificar user agent ou combinação de touch e largura da tela
+        return mobileRegex.test(ua) || ('ontouchstart' in window && window.innerWidth < 1024);
+    }
+
+    /**
+     * Verifica se deve registrar o token FCM baseado no tipo de dispositivo e modo de execução
+     * 
+     * Regras:
+     * - Desktop: sempre registra
+     * - Mobile no navegador: não registra
+     * - Mobile no PWA: registra
+     * 
+     * @return {boolean} true se deve registrar, false caso contrário
+     */
+    function shouldRegisterToken() {
+        // Desktop sempre registra
+        if (!isMobile()) {
+            return true;
+        }
+        // Mobile só registra se for PWA
+        return isPWA();
+    }
+
+    /**
      * Solicita permissão de notificação e registra token
      */
     function requestNotificationPermission(messaging, vapidKey) {
@@ -157,7 +208,7 @@
             if (permission === 'granted') {
                 messaging.getToken({ vapidKey: vapidKey })
                     .then((currentToken) => {
-                        if (currentToken) {
+                        if (currentToken && shouldRegisterToken()) {
                             registerToken(currentToken);
                         }
                     })
@@ -171,7 +222,7 @@
         messaging.onTokenRefresh(() => {
             messaging.getToken({ vapidKey: vapidKey })
                 .then((refreshedToken) => {
-                    if (refreshedToken) {
+                    if (refreshedToken && shouldRegisterToken()) {
                         registerToken(refreshedToken);
                     }
                 })

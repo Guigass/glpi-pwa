@@ -231,6 +231,57 @@
     }
 
     /**
+     * Verifica se o dispositivo está rodando como PWA instalado
+     * 
+     * @return {boolean} true se está rodando como PWA, false caso contrário
+     */
+    function isPWA() {
+        // Android/Chrome/Edge - verificar display-mode standalone ou fullscreen
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+            return true;
+        }
+        if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) {
+            return true;
+        }
+        // iOS Safari - verificar navigator.standalone
+        if (window.navigator.standalone === true) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Verifica se o dispositivo é mobile
+     * 
+     * @return {boolean} true se é mobile, false caso contrário
+     */
+    function isMobile() {
+        const ua = navigator.userAgent.toLowerCase();
+        const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+        // Verificar user agent ou combinação de touch e largura da tela
+        return mobileRegex.test(ua) || ('ontouchstart' in window && window.innerWidth < 1024);
+    }
+
+    /**
+     * Verifica se deve registrar o token FCM baseado no tipo de dispositivo e modo de execução
+     * 
+     * Regras:
+     * - Desktop: sempre registra
+     * - Mobile no navegador: não registra
+     * - Mobile no PWA: registra
+     * 
+     * @return {boolean} true se deve registrar, false caso contrário
+     */
+    function shouldRegisterToken() {
+        // Desktop sempre registra
+        if (!isMobile()) {
+            return true;
+        }
+        // Mobile só registra se for PWA
+        return isPWA();
+    }
+
+    /**
      * Aguarda o Service Worker estar no estado 'activated'
      */
     function waitForServiceWorkerActive(registration) {
@@ -352,6 +403,55 @@
         // IMPORTANTE: Deve aguardar o Service Worker estar activated
         // OTIMIZAÇÃO: Verifica token armazenado antes de solicitar novo ao Firebase
         function getFCMToken(forceRefresh = false) {
+            // Função auxiliar para verificar e registrar token se necessário
+            // Esta função sempre verifica as condições atuais, mesmo para tokens armazenados
+            // Rastreia as condições quando registra para detectar mudanças futuras
+            const checkAndRegisterTokenIfNeeded = (token) => {
+                if (!token) {
+                    return;
+                }
+
+                const shouldRegister = shouldRegisterToken();
+                const registrationStateKey = 'glpipwa_token_state_' + token;
+
+                try {
+                    const storedState = localStorage.getItem(registrationStateKey);
+                    // storedState contém: "registered|isMobile|isPWA" ou null
+                    // Exemplo: "registered|1|0" significa: registrado quando era mobile não-PWA
+                    const storedParts = storedState ? storedState.split('|') : [];
+                    const wasRegistered = storedParts[0] === 'registered';
+                    const storedIsMobile = storedParts[1] === '1';
+                    const storedIsPWA = storedParts[2] === '1';
+
+                    // Verificar se as condições atuais requerem registro
+                    const currentIsMobile = isMobile();
+                    const currentIsPWA = isPWA();
+                    const conditionsChanged = storedIsMobile !== currentIsMobile || storedIsPWA !== currentIsPWA;
+
+                    if (shouldRegister) {
+                        // Deve registrar: verificar se precisa fazer registro
+                        if (!wasRegistered || conditionsChanged) {
+                            // Nunca foi registrado ou condições mudaram - registrar
+                            registerToken(token);
+                            // Armazenar estado atual
+                            const newState = 'registered|' + (currentIsMobile ? '1' : '0') + '|' + (currentIsPWA ? '1' : '0');
+                            localStorage.setItem(registrationStateKey, newState);
+                        }
+                        // Se já estava registrado e condições não mudaram, não precisa fazer nada
+                    } else {
+                        // Não deve registrar - limpar flag se existia
+                        if (wasRegistered) {
+                            localStorage.removeItem(registrationStateKey);
+                        }
+                    }
+                } catch (e) {
+                    // Se localStorage falhar, tentar registrar mesmo assim se deve registrar
+                    if (shouldRegister) {
+                        registerToken(token);
+                    }
+                }
+            };
+
             // Função auxiliar para processar token obtido do Firebase
             const processToken = (currentToken) => {
                 if (currentToken) {
@@ -362,10 +462,19 @@
                     // Armazenar token no localStorage
                     storeFCMToken(currentToken);
 
-                    // Registrar no servidor apenas se for diferente do armazenado
-                    if (needsRegistration) {
-                        registerToken(currentToken);
+                    // Se o token mudou, limpar flag de registro do token anterior
+                    if (needsRegistration && storedToken) {
+                        try {
+                            const oldStateKey = 'glpipwa_token_state_' + storedToken;
+                            localStorage.removeItem(oldStateKey);
+                        } catch (e) {
+                            // Ignorar erros de localStorage
+                        }
                     }
+
+                    // Verificar e registrar se necessário (sempre verifica condições atuais)
+                    checkAndRegisterTokenIfNeeded(currentToken);
+
                     return currentToken;
                 } else {
                     // Se não há token, limpar armazenamento
@@ -418,6 +527,10 @@
                 const storedToken = getStoredFCMToken();
                 if (storedToken && isStoredTokenValid()) {
                     // Token válido encontrado
+                    // IMPORTANTE: Verificar se deve registrar mesmo para token armazenado
+                    // Isso garante que se as condições mudaram (ex: PWA instalado), o token será registrado
+                    checkAndRegisterTokenIfNeeded(storedToken);
+
                     // IMPORTANTE: Mesmo com token armazenado, precisamos aguardar o SW estar pronto
                     // para evitar erros do Firebase ao tentar acessar pushManager
                     if (!swRegistration) {
@@ -429,7 +542,8 @@
                     // Isso evita erros do Firebase ao tentar acessar pushManager de undefined
                     return waitForServiceWorkerActive(swRegistration)
                         .then(() => {
-                            // SW está pronto, retornar token armazenado
+                            // SW está pronto, verificar novamente se deve registrar (pode ter mudado durante a espera)
+                            checkAndRegisterTokenIfNeeded(storedToken);
                             return storedToken;
                         })
                         .catch((error) => {
@@ -440,7 +554,11 @@
                             };
                             return messaging.getToken(tokenOptions)
                                 .then(processToken)
-                                .catch(() => storedToken); // Se falhar, retornar token armazenado
+                                .catch(() => {
+                                    // Se falhar, verificar se deve registrar o token armazenado
+                                    checkAndRegisterTokenIfNeeded(storedToken);
+                                    return storedToken;
+                                });
                         });
                 }
             }
