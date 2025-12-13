@@ -111,45 +111,98 @@ if (!isset($data['token']) || empty($data['token'])) {
     exit;
 }
 
+// Validar device_id
+if (!isset($data['device_id']) || empty($data['device_id'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'device_id não fornecido']);
+    exit;
+}
+
 // Validar e sanitizar token
 $token = isset($data['token']) ? trim($data['token']) : '';
-if (empty($token) || strlen($token) > 255) {
+if (empty($token)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Token inválido']);
     exit;
 }
 
 // Validar formato do token FCM (deve ser alfanumérico com alguns caracteres especiais)
+// Tokens FCM podem ser longos, então não limitamos o tamanho aqui
 if (!preg_match('/^[a-zA-Z0-9_:\-]+$/', $token)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Formato de token inválido']);
     exit;
 }
 
+// Validar device_id (deve ser UUID v4)
+$device_id = isset($data['device_id']) ? trim($data['device_id']) : '';
+if (empty($device_id) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $device_id)) {
+    // Se não for UUID válido, gerar um novo no servidor (fallback)
+    // Mas ainda assim validar que não está vazio
+    if (empty($device_id)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'device_id inválido']);
+        exit;
+    }
+    // Se device_id não é UUID válido mas não está vazio, aceitar mas gerar UUID no servidor
+    // Isso permite compatibilidade com versões antigas
+    $device_id = null; // Será gerado no servidor
+}
+
 $user_agent = isset($data['user_agent']) ? substr(trim($data['user_agent']), 0, 255) : ($_SERVER['HTTP_USER_AGENT'] ?? null);
 $users_id = Session::getLoginUserID();
 
-// Log para debug
-Toolbox::logInFile('glpipwa', "GLPI PWA register.php: Tentando registrar token para users_id: {$users_id}", LOG_DEBUG);
+// Detectar platform
+$platform = 'web';
+if (isset($_SERVER['HTTP_USER_AGENT'])) {
+    $ua = strtolower($_SERVER['HTTP_USER_AGENT']);
+    if (strpos($ua, 'android') !== false) {
+        $platform = 'android';
+    } elseif (strpos($ua, 'iphone') !== false || strpos($ua, 'ipad') !== false) {
+        $platform = 'ios';
+    }
+}
 
-// Registrar token
+// Se device_id não foi fornecido ou é inválido, gerar UUID v4 no servidor
+if ($device_id === null) {
+    // Gerar UUID v4 usando random_bytes (PHP 7+)
+    $data_bytes = random_bytes(16);
+    $data_bytes[6] = chr(ord($data_bytes[6]) & 0x0f | 0x40); // versão 4
+    $data_bytes[8] = chr(ord($data_bytes[8]) & 0x3f | 0x80); // variante 10
+    $hex = bin2hex($data_bytes);
+    $device_id = sprintf(
+        '%08s-%04s-%04s-%04s-%012s',
+        substr($hex, 0, 8),
+        substr($hex, 8, 4),
+        substr($hex, 12, 4),
+        substr($hex, 16, 4),
+        substr($hex, 20, 12)
+    );
+}
+
+// Log para debug
+
+// Registrar dispositivo (usa nova classe Device)
 try {
-    $result = PluginGlpipwaToken::addToken($users_id, $token, $user_agent);
+    $result = PluginGlpipwaDevice::addDevice($users_id, $device_id, $token, $user_agent, $platform);
 
     if ($result) {
-        Toolbox::logInFile('glpipwa', "GLPI PWA register.php: Token registrado com sucesso (ID: {$result}, users_id: {$users_id})", LOG_DEBUG);
-        echo json_encode(['success' => true, 'message' => 'Token registrado com sucesso']);
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Dispositivo registrado com sucesso',
+            'device_id' => $device_id // Retornar device_id para o cliente armazenar se foi gerado no servidor
+        ]);
     } else {
-        Toolbox::logInFile('glpipwa', "GLPI PWA register.php: Falha ao registrar token (users_id: {$users_id}) - addToken retornou false", LOG_ERR);
+        Toolbox::logInFile('glpipwa', "GLPI PWA register.php: Falha ao registrar dispositivo (users_id: {$users_id}, device_id: {$device_id}) - addDevice retornou false", LOG_ERR);
         http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Erro ao registrar token']);
+        echo json_encode(['success' => false, 'error' => 'Erro ao registrar dispositivo']);
     }
 } catch (Exception $e) {
-    Toolbox::logInFile('glpipwa', 'GLPI PWA register.php: Exceção ao registrar token: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString(), LOG_ERR);
+    Toolbox::logInFile('glpipwa', 'GLPI PWA register.php: Exceção ao registrar dispositivo: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString(), LOG_ERR);
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Erro interno do servidor']);
 } catch (Throwable $e) {
-    Toolbox::logInFile('glpipwa', 'GLPI PWA register.php: Erro fatal ao registrar token: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString(), LOG_ERR);
+    Toolbox::logInFile('glpipwa', 'GLPI PWA register.php: Erro fatal ao registrar dispositivo: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString(), LOG_ERR);
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Erro interno do servidor']);
 }
