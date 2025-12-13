@@ -56,6 +56,7 @@ function plugin_glpipwa_load_classes() {
         $files = [
             __DIR__ . '/inc/Config.php',
             __DIR__ . '/inc/Token.php',
+            __DIR__ . '/inc/Device.php',
             __DIR__ . '/inc/FirebaseAuth.php',
             __DIR__ . '/inc/NotificationPush.php',
             __DIR__ . '/inc/NotificationService.php',

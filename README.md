@@ -104,7 +104,7 @@ glpipwa/
 │       └── notification.php        # Endpoints AJAX de notificação
 │
 ├── js/                             # JavaScript (Frontend)
-│   ├── register-sw.js              # Registro do SW e inicialização Firebase
+│   ├── glpipwa.js                  # Inicialização PWA, registro do SW e Firebase
 │   └── sw.js                       # Service Worker (fallback)
 │
 ├── pics/                           # Ícones e imagens
@@ -128,7 +128,7 @@ glpipwa/
 ┌─────────────────────────────────────────────────────────────┐
 │                        FRONTEND                              │
 ├─────────────────────────────────────────────────────────────┤
-│  register-sw.js                                             │
+│  glpipwa.js                                                 │
 │  ├── Registra Service Worker via sw-proxy.php               │
 │  ├── Carrega Firebase SDK (compat)                          │
 │  ├── Solicita permissão de notificação                      │
