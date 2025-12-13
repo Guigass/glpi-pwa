@@ -44,14 +44,6 @@ if (!Session::haveRight('config', UPDATE)) {
 
 // Processar remoção de token individual
 if (isset($_POST['delete_token']) && isset($_POST['token_id'])) {
-    // Validar CSRF token - seguir padrão do notification.php
-    $csrf_token = $_POST['_glpi_csrf_token'] ?? '';
-    if (empty($csrf_token) || !Session::validateCSRF(['_glpi_csrf_token' => $csrf_token])) {
-        Session::addMessageAfterRedirect(__('Invalid security token', 'glpipwa'), true, ERROR);
-        Html::redirect($plugin_url . '?tab=tokens');
-        exit;
-    }
-    
     $token_id = (int)$_POST['token_id'];
     if ($token_id > 0) {
         try {
@@ -72,14 +64,6 @@ if (isset($_POST['delete_token']) && isset($_POST['token_id'])) {
 
 // Processar remoção de todos os tokens
 if (isset($_POST['delete_all_tokens'])) {
-    // Validar CSRF token - seguir padrão do notification.php
-    $csrf_token = $_POST['_glpi_csrf_token'] ?? '';
-    if (empty($csrf_token) || !Session::validateCSRF(['_glpi_csrf_token' => $csrf_token])) {
-        Session::addMessageAfterRedirect(__('Invalid security token', 'glpipwa'), true, ERROR);
-        Html::redirect($plugin_url . '?tab=tokens');
-        exit;
-    }
-    
     try {
         $deleted = PluginGlpipwaToken::deleteAllTokens();
         if ($deleted > 0) {
@@ -93,6 +77,44 @@ if (isset($_POST['delete_all_tokens'])) {
         Session::addMessageAfterRedirect(__('Error removing tokens', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
     }
     Html::redirect($plugin_url . '?tab=tokens');
+    exit;
+}
+
+// Processar remoção de device individual
+if (isset($_POST['delete_device']) && isset($_POST['device_id'])) {
+    $device_id = (int)$_POST['device_id'];
+    if ($device_id > 0) {
+        try {
+            if (PluginGlpipwaDevice::deleteDeviceById($device_id)) {
+                Session::addMessageAfterRedirect(__('Device removed successfully', 'glpipwa'), true, INFO);
+            } else {
+                Session::addMessageAfterRedirect(__('Error removing device', 'glpipwa'), true, ERROR);
+            }
+        } catch (Exception $e) {
+            Session::addMessageAfterRedirect(__('Error removing device', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+        } catch (Throwable $e) {
+            Session::addMessageAfterRedirect(__('Error removing device', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+        }
+    }
+    Html::redirect($plugin_url . '?tab=devices');
+    exit;
+}
+
+// Processar remoção de todos os devices
+if (isset($_POST['delete_all_devices'])) {
+    try {
+        $deleted = PluginGlpipwaDevice::deleteAllDevices();
+        if ($deleted > 0) {
+            Session::addMessageAfterRedirect(__('All devices removed successfully', 'glpipwa'), true, INFO);
+        } else {
+            Session::addMessageAfterRedirect(__('No devices to remove', 'glpipwa'), true, INFO);
+        }
+    } catch (Exception $e) {
+        Session::addMessageAfterRedirect(__('Error removing devices', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+    } catch (Throwable $e) {
+        Session::addMessageAfterRedirect(__('Error removing devices', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+    }
+    Html::redirect($plugin_url . '?tab=devices');
     exit;
 }
 
@@ -245,7 +267,8 @@ $active_tab = $_GET['tab'] ?? 'config';
 // Definir abas
 $tabs = [
     'config' => __('Configuration', 'glpipwa'),
-    'tokens' => __('Tokens', 'glpipwa')
+    'tokens' => __('Tokens', 'glpipwa'),
+    'devices' => __('Devices', 'glpipwa')
 ];
 
 // Exibir abas manualmente usando estrutura padrão do GLPI
@@ -255,7 +278,7 @@ echo "<tr class='tab_bg_1'>";
 foreach ($tabs as $tab_key => $tab_label) {
     $active_class = ($active_tab === $tab_key) ? 'tab_on' : '';
     $tab_url = $plugin_url . '?tab=' . urlencode($tab_key);
-    echo "<th class='$active_class' style='width: 50%; text-align: center;'>";
+    echo "<th class='$active_class' style='width: 33.33%; text-align: center;'>";
     echo "<a href='" . htmlspecialchars($tab_url) . "' style='display: block; padding: 10px; text-decoration: none; color: inherit;'>" . htmlspecialchars($tab_label) . "</a>";
     echo "</th>";
 }
@@ -510,10 +533,9 @@ if ($active_tab === 'tokens') {
         echo "<tr class='tab_bg_2'>";
         echo "<td colspan='6' class='center'>";
         echo "<form method='post' action='" . htmlspecialchars($plugin_url . '?tab=tokens') . "' style='display:inline;'>";
-        echo "<input type='hidden' name='_glpi_csrf_token' value='" . htmlspecialchars(Session::getNewCSRFToken()) . "'>";
         echo "<input type='hidden' name='delete_all_tokens' value='1'>";
         echo "<input type='submit' value='" . __('Remove All Tokens', 'glpipwa') . "' class='submit' onclick=\"return confirm('" . __('Are you sure you want to remove all tokens?', 'glpipwa') . "');\">";
-        echo "</form>";
+        Html::closeForm();
         echo "</td>";
         echo "</tr>";
         
@@ -563,10 +585,115 @@ if ($active_tab === 'tokens') {
             echo "<td>" . htmlspecialchars($user_agent) . "</td>";
             echo "<td class='center'>";
             echo "<form method='post' action='" . htmlspecialchars($plugin_url . '?tab=tokens') . "' style='display:inline;'>";
-            echo "<input type='hidden' name='_glpi_csrf_token' value='" . htmlspecialchars(Session::getNewCSRFToken()) . "'>";
             echo "<input type='hidden' name='token_id' value='$token_id'>";
             echo "<input type='submit' name='delete_token' value='" . __('Remove', 'glpipwa') . "' class='submit'>";
-            echo "</form>";
+            Html::closeForm();
+            echo "</td>";
+            echo "</tr>";
+        }
+    }
+    
+    echo "</table>";
+}
+
+// Aba de Devices
+if ($active_tab === 'devices') {
+    try {
+        $devices = PluginGlpipwaDevice::getAllDevices();
+    } catch (Exception $e) {
+        $devices = [];
+        Session::addMessageAfterRedirect(__('Error loading devices', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+    } catch (Throwable $e) {
+        $devices = [];
+        Session::addMessageAfterRedirect(__('Error loading devices', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+    }
+    
+    echo "<table class='tab_cadre_fixe'>";
+    echo "<tr class='tab_bg_1'><th colspan='9'>" . __('Registered Devices', 'glpipwa') . "</th></tr>";
+    
+    if (empty($devices) || !is_array($devices)) {
+        echo "<tr class='tab_bg_2'>";
+        echo "<td colspan='9' class='center' style='padding: 20px;'>";
+        echo "<strong>" . __('No devices registered', 'glpipwa') . "</strong><br>";
+        echo "<small>" . __('Devices will appear here when users register their devices for push notifications.', 'glpipwa') . "</small>";
+        echo "</td>";
+        echo "</tr>";
+    } else {
+        // Botão remover todos
+        echo "<tr class='tab_bg_2'>";
+        echo "<td colspan='9' class='center'>";
+        echo "<form method='post' action='" . htmlspecialchars($plugin_url . '?tab=devices') . "' style='display:inline;'>";
+        echo "<input type='hidden' name='delete_all_devices' value='1'>";
+        echo "<input type='submit' value='" . __('Remove All Devices', 'glpipwa') . "' class='submit' onclick=\"return confirm('" . __('Are you sure you want to remove all devices?', 'glpipwa') . "');\">";
+        Html::closeForm();
+        echo "</td>";
+        echo "</tr>";
+        
+        // Cabeçalho da tabela
+        echo "<tr class='tab_bg_1'>";
+        echo "<th>" . __('ID', 'glpipwa') . "</th>";
+        echo "<th>" . __('User', 'glpipwa') . "</th>";
+        echo "<th>" . __('Device ID', 'glpipwa') . "</th>";
+        echo "<th>" . __('FCM Token', 'glpipwa') . "</th>";
+        echo "<th>" . __('Platform', 'glpipwa') . "</th>";
+        echo "<th>" . __('Last Seen', 'glpipwa') . "</th>";
+        echo "<th>" . __('Creation Date', 'glpipwa') . "</th>";
+        echo "<th>" . __('User Agent', 'glpipwa') . "</th>";
+        echo "<th>" . __('Actions', 'glpipwa') . "</th>";
+        echo "</tr>";
+        
+        // Listar devices
+        foreach ($devices as $device_data) {
+            $device_id = $device_data['id'];
+            $users_id = $device_data['users_id'];
+            $device_device_id = $device_data['device_id'];
+            $fcm_token = $device_data['fcm_token'];
+            $user_agent = $device_data['user_agent'] ?? '';
+            $platform = $device_data['platform'] ?? '';
+            $last_seen_at = $device_data['last_seen_at'] ?? '';
+            $date_creation = $device_data['date_creation'] ?? '';
+            
+            // Formatar FCM token (primeiros 10 e últimos 10 caracteres)
+            $token_length = strlen($fcm_token);
+            if ($token_length > 20) {
+                $formatted_token = substr($fcm_token, 0, 10) . '...' . substr($fcm_token, -10);
+            } else {
+                $formatted_token = $fcm_token;
+            }
+            
+            // Obter nome do usuário
+            $user_name = User::getFriendlyNameById($users_id);
+            if (empty($user_name)) {
+                $user_name = __('Unknown', 'glpipwa') . " (ID: $users_id)";
+            }
+            
+            // Formatar datas
+            $formatted_date_creation = '';
+            if (!empty($date_creation)) {
+                $formatted_date_creation = Html::convDateTime($date_creation);
+            }
+            
+            $formatted_last_seen = '';
+            if (!empty($last_seen_at)) {
+                $formatted_last_seen = Html::convDateTime($last_seen_at);
+            } else {
+                $formatted_last_seen = __('Never', 'glpipwa');
+            }
+            
+            echo "<tr class='tab_bg_2'>";
+            echo "<td>$device_id</td>";
+            echo "<td>" . htmlspecialchars($user_name) . "</td>";
+            echo "<td><code>" . htmlspecialchars($device_device_id) . "</code></td>";
+            echo "<td><code>" . htmlspecialchars($formatted_token) . "</code></td>";
+            echo "<td>" . htmlspecialchars($platform) . "</td>";
+            echo "<td>$formatted_last_seen</td>";
+            echo "<td>$formatted_date_creation</td>";
+            echo "<td>" . htmlspecialchars($user_agent) . "</td>";
+            echo "<td class='center'>";
+            echo "<form method='post' action='" . htmlspecialchars($plugin_url . '?tab=devices') . "' style='display:inline;'>";
+            echo "<input type='hidden' name='device_id' value='$device_id'>";
+            echo "<input type='submit' name='delete_device' value='" . __('Remove', 'glpipwa') . "' class='submit'>";
+            Html::closeForm();
             echo "</td>";
             echo "</tr>";
         }
