@@ -777,6 +777,10 @@ msgid "Error loading tokens"
 msgstr "Erro ao carregar tokens"
 
 #: front/config.form.php
+msgid "Error removing tokens"
+msgstr "Erro ao remover tokens"
+
+#: front/config.form.php
 msgid "Tokens will appear here when users register their devices for push notifications."
 msgstr "Os tokens aparecerão aqui quando os usuários registrarem seus dispositivos para notificações push."
 

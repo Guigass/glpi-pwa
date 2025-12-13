@@ -34,34 +34,49 @@ define('PLUGIN_GLPIPWA_VERSION', '1.0.6');
 
 /**
  * Carrega as classes do plugin quando necessário
+ * Esta função só deve ser chamada após o GLPI estar completamente inicializado
  */
 function plugin_glpipwa_load_classes() {
     static $loaded = false;
-    if (!$loaded && defined('GLPI_ROOT')) {
-        try {
-            $files = [
-                __DIR__ . '/inc/Config.php',
-                __DIR__ . '/inc/Token.php',
-                __DIR__ . '/inc/FirebaseAuth.php',
-                __DIR__ . '/inc/NotificationPush.php',
-                __DIR__ . '/inc/NotificationService.php',
-                __DIR__ . '/inc/Manifest.php',
-                __DIR__ . '/inc/Icon.php',
-                __DIR__ . '/inc/Cron.php',
-                __DIR__ . '/inc/StaticFileServer.php',
-            ];
-            
-            foreach ($files as $file) {
-                if (file_exists($file)) {
-                    require_once($file);
-                }
+    if ($loaded) {
+        return;
+    }
+    
+    // Verificar se GLPI_ROOT está definido antes de tentar carregar
+    if (!defined('GLPI_ROOT')) {
+        return;
+    }
+    
+    // Verificar se o diretório do plugin existe
+    if (!is_dir(__DIR__ . '/inc')) {
+        return;
+    }
+    
+    try {
+        $files = [
+            __DIR__ . '/inc/Config.php',
+            __DIR__ . '/inc/Token.php',
+            __DIR__ . '/inc/FirebaseAuth.php',
+            __DIR__ . '/inc/NotificationPush.php',
+            __DIR__ . '/inc/NotificationService.php',
+            __DIR__ . '/inc/Manifest.php',
+            __DIR__ . '/inc/Icon.php',
+            __DIR__ . '/inc/Cron.php',
+            __DIR__ . '/inc/StaticFileServer.php',
+        ];
+        
+        foreach ($files as $file) {
+            if (file_exists($file) && is_readable($file)) {
+                require_once($file);
             }
-            $loaded = true;
-        } catch (Exception $e) {
-            // Silenciosamente ignora erros ao carregar classes
-        } catch (Throwable $e) {
-            // Silenciosamente ignora erros fatais também
         }
+        $loaded = true;
+    } catch (Exception $e) {
+        // Silenciosamente ignora erros ao carregar classes
+        // Log do erro pode ser adicionado aqui se necessário para debug
+    } catch (Throwable $e) {
+        // Silenciosamente ignora erros fatais também
+        // Log do erro pode ser adicionado aqui se necessário para debug
     }
 }
 
@@ -140,13 +155,21 @@ function plugin_init_glpipwa() {
 /**
  * Retorna informações de versão do plugin
  * Esta função DEVE existir e ser acessível para o GLPI carregar o plugin
+ * IMPORTANTE: Esta função deve ser completamente independente e não depender
+ * de nenhuma classe ou função externa que possa não estar disponível
  */
 function plugin_version_glpipwa() {
+    // Garantir que a versão está definida
+    if (!defined('PLUGIN_GLPIPWA_VERSION')) {
+        define('PLUGIN_GLPIPWA_VERSION', '1.0.6');
+    }
+    
     // Não usar __() aqui pois pode não estar disponível quando o plugin é carregado
     // Retornar array simples sem try/catch para evitar qualquer problema
+    // Esta função deve ser completamente autossuficiente
     return [
         'name'           => 'GLPI PWA',
-        'version'        => defined('PLUGIN_GLPIPWA_VERSION') ? PLUGIN_GLPIPWA_VERSION : '1.0.6',
+        'version'        => PLUGIN_GLPIPWA_VERSION,
         'author'         => 'GLPI Community',
         'license'        => 'GPLv2+',
         'homepage'       => 'https://github.com/glpi-project/glpi-pwa',

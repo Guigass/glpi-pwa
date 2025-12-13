@@ -152,36 +152,86 @@ const urlsToCache = [
     '/index.php',
 ];
 
+// Função auxiliar para logging de erros no Service Worker
+function swLogError(message, data = null) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[GLPI PWA SW \${timestamp}] \${message}`;
+    console.error(logMessage, data || '');
+}
+
 // Importar Firebase SDK compat para messaging
-importScripts('https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.17.1/firebase-messaging-compat.js');
+try {
+    importScripts('https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js');
+    importScripts('https://www.gstatic.com/firebasejs/9.17.1/firebase-messaging-compat.js');
+} catch (error) {
+    swLogError('ERRO ao carregar Firebase SDK', error);
+}
 
 // Inicializar Firebase se configurado
-if (FIREBASE_CONFIG.apiKey) {
-    firebase.initializeApp(FIREBASE_CONFIG);
-    const messaging = firebase.messaging();
-
-    // Handler para mensagens em background
-    messaging.onBackgroundMessage((payload) => {
-        const notificationTitle = payload.notification?.title || 'GLPI';
+if (FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) {
+    try {
+        firebase.initializeApp(FIREBASE_CONFIG);
         
-        // Usar notification_id único se disponível, senão criar um baseado em timestamp
-        // Isso garante que cada notificação seja exibida separadamente
-        const notificationTag = payload.data?.notification_id || 
-                               `glpi-\${payload.data?.ticket_id || 'notification'}-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}`;
-        
-        const notificationOptions = {
-            body: payload.notification?.body || '',
-            icon: payload.notification?.icon || '/pics/glpi.png?v1',
-            badge: '/pics/glpi.png?v1',
-            data: payload.data || {},
-            tag: notificationTag, // Tag único para cada notificação
-            requireInteraction: false,
-            timestamp: Date.now(), // Timestamp para ordenação
-        };
+        const messaging = firebase.messaging();
 
-        self.registration.showNotification(notificationTitle, notificationOptions);
-    });
+        // Handler para mensagens em background
+        // IMPORTANTE SOBRE COMPORTAMENTO DO FCM:
+        // - Mensagens com campo 'notification': O sistema exibe automaticamente quando app está em background
+        //   e NÃO chama onBackgroundMessage. Quando app está em foreground, chama onMessage na página principal.
+        // - Mensagens apenas com 'data': Sempre chamam onBackgroundMessage quando app está em background.
+        // Por isso, este handler pode não ser chamado para mensagens com 'notification' quando app está em background,
+        // mas ainda é necessário para mensagens apenas com 'data' ou para garantir funcionamento.
+        messaging.onBackgroundMessage((payload) => {
+            try {
+                if (!self.registration) {
+                    swLogError('ERRO: self.registration não está disponível');
+                    return Promise.reject(new Error('self.registration não disponível'));
+                }
+
+                const notificationTitle = payload.notification?.title || 'GLPI';
+                
+                // Usar notification_id único se disponível, senão criar um baseado em timestamp
+                // CORRIGIDO: usar template literals corretamente (com escape para PHP)
+                const ticketId = payload.data?.ticket_id || 'notification';
+                const timestamp = Date.now();
+                const randomStr = Math.random().toString(36).substr(2, 9);
+                const notificationTag = payload.data?.notification_id || 
+                                       `glpi-\${ticketId}-\${timestamp}-\${randomStr}`;
+
+                const notificationOptions = {
+                    body: payload.notification?.body || '',
+                    icon: payload.notification?.icon || '/pics/glpi.png?v1',
+                    badge: '/pics/glpi.png?v1',
+                    data: payload.data || {},
+                    tag: notificationTag, // Tag único para cada notificação
+                    requireInteraction: false,
+                    timestamp: Date.now(), // Timestamp para ordenação
+                };
+
+                return self.registration.showNotification(notificationTitle, notificationOptions)
+                    .catch((error) => {
+                        swLogError('ERRO ao exibir notificação', error);
+                        throw error;
+                    });
+            } catch (error) {
+                swLogError('ERRO em onBackgroundMessage', {
+                    error: error.message,
+                    stack: error.stack,
+                    payload: payload
+                });
+                return Promise.reject(error);
+            }
+        });
+    } catch (error) {
+        swLogError('ERRO ao inicializar Firebase ou registrar onBackgroundMessage', {
+            error: error.message,
+            stack: error.stack,
+            config: FIREBASE_CONFIG ? {
+                hasApiKey: !!FIREBASE_CONFIG.apiKey,
+                hasProjectId: !!FIREBASE_CONFIG.projectId
+            } : 'config vazio'
+        });
+    }
 }
 
 // Instalação do Service Worker
@@ -192,7 +242,8 @@ self.addEventListener('install', (event) => {
                 return cache.addAll(urlsToCache);
             })
             .catch((error) => {
-                // Silenciosamente ignora erros de cache
+                swLogError('Erro ao instalar cache (não crítico)', error);
+                // Silenciosamente ignora erros de cache - não é crítico
             })
     );
     self.skipWaiting();
@@ -210,8 +261,13 @@ self.addEventListener('activate', (event) => {
                 })
             );
         })
+        .then(() => {
+            return self.clients.claim();
+        })
+        .catch((error) => {
+            swLogError('Erro ao ativar Service Worker', error);
+        })
     );
-    return self.clients.claim();
 });
 
 // Função auxiliar para verificar se uma URL é de autenticação
@@ -355,37 +411,56 @@ self.addEventListener('fetch', (event) => {
 // Recebimento de notificações push (fallback APENAS se Firebase não estiver configurado)
 // Se Firebase está configurado, ele processa via onBackgroundMessage acima
 // Não registrar listener push quando Firebase está ativo para evitar duplicação
-if (!FIREBASE_CONFIG.apiKey) {
+if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) {
     self.addEventListener('push', (event) => {
-        let data = {};
-        
-        if (event.data) {
-            try {
-                data = event.data.json();
-            } catch (e) {
-                data = { body: event.data.text() };
+        try {
+            let data = {};
+            
+            if (event.data) {
+                try {
+                    data = event.data.json();
+                } catch (e) {
+                    swLogError('Erro ao parsear push data', e);
+                    data = { body: event.data.text() };
+                }
             }
+
+            const title = data.notification?.title || data.title || 'GLPI';
+            
+            // CORRIGIDO: usar template literals corretamente (com escape para PHP)
+            const ticketId = data.data?.ticket_id || 'notification';
+            const timestamp = Date.now();
+            const randomStr = Math.random().toString(36).substr(2, 9);
+            const notificationTag = data.data?.notification_id || 
+                                   `glpi-\${ticketId}-\${timestamp}-\${randomStr}`;
+            
+            const options = {
+                body: data.notification?.body || data.body || '',
+                icon: data.notification?.icon || '/pics/glpi.png?v1',
+                badge: '/pics/glpi.png?v1',
+                data: data.data || {},
+                tag: notificationTag, // Tag único para cada notificação
+                requireInteraction: false,
+                timestamp: Date.now(), // Timestamp para ordenação
+            };
+
+            if (!self.registration) {
+                swLogError('ERRO: self.registration não está disponível no push event');
+                return;
+            }
+
+            event.waitUntil(
+                self.registration.showNotification(title, options)
+                    .catch((error) => {
+                        swLogError('ERRO ao exibir notificação push (fallback)', error);
+                    })
+            );
+        } catch (error) {
+            swLogError('ERRO no push event listener (fallback)', {
+                error: error.message,
+                stack: error.stack
+            });
         }
-
-        const title = data.notification?.title || data.title || 'GLPI';
-        
-        // Usar notification_id único se disponível, senão criar um baseado em timestamp
-        const notificationTag = data.data?.notification_id || 
-                               `glpi-\${data.data?.ticket_id || 'notification'}-\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}`;
-        
-        const options = {
-            body: data.notification?.body || data.body || '',
-            icon: data.notification?.icon || '/pics/glpi.png?v1',
-            badge: '/pics/glpi.png?v1',
-            data: data.data || {},
-            tag: notificationTag, // Tag único para cada notificação
-            requireInteraction: false,
-            timestamp: Date.now(), // Timestamp para ordenação
-        };
-
-        event.waitUntil(
-            self.registration.showNotification(title, options)
-        );
     });
 }
 

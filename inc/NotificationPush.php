@@ -222,62 +222,161 @@ class PluginGlpipwaNotificationPush
         curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos para a requisição completa
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Timeout de 10 segundos para conexão
 
+        // Logar payload enviado (com token mascarado para segurança)
+        $maskedMessage = $message;
+        if (isset($maskedMessage['message']['token'])) {
+            $maskedToken = substr($maskedMessage['message']['token'], 0, 10) . '...' . substr($maskedMessage['message']['token'], -10);
+            $maskedMessage['message']['token'] = $maskedToken;
+        }
+        Toolbox::logInFile('glpipwa', "GLPI PWA FCM: Enviando mensagem - Payload: " . json_encode($maskedMessage), LOG_DEBUG);
+
         $result = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
 
         if ($error) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA FCM Error: " . $error, LOG_ERR);
+            Toolbox::logInFile('glpipwa', "GLPI PWA FCM Error (cURL): " . $error, LOG_ERR);
+            return false;
+        }
+
+        // Verificar se a resposta está vazia
+        if (empty($result)) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA FCM Error: Resposta vazia do servidor (HTTP {$httpCode})", LOG_ERR);
             return false;
         }
 
         $response = json_decode($result, true);
 
+        // Verificar se o JSON foi decodificado corretamente
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA FCM Error: Resposta JSON inválida (HTTP {$httpCode}) - " . json_last_error_msg() . " - Resposta: " . substr($result, 0, 500), LOG_ERR);
+            return false;
+        }
+
+        // Verificar se a resposta é um array válido
+        if (!is_array($response)) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA FCM Error: Resposta não é um array válido (HTTP {$httpCode}) - Resposta: " . substr($result, 0, 500), LOG_ERR);
+            return false;
+        }
+
         // Tratamento de erros FCM v1
         if ($httpCode !== 200) {
             $errorMessage = $response['error']['message'] ?? 'Unknown error';
             $errorCode = $response['error']['code'] ?? 'UNKNOWN';
+            $errorStatus = $response['error']['status'] ?? null;
             
-            Toolbox::logInFile('glpipwa', "GLPI PWA FCM HTTP Error: " . $httpCode . " - " . $errorCode . " - " . $errorMessage, LOG_ERR);
+            // Tentar obter o errorCode real dos details (FCM v1 usa details[0].errorCode)
+            $fcmErrorCode = null;
+            if (isset($response['error']['details']) && is_array($response['error']['details']) && !empty($response['error']['details'])) {
+                $fcmErrorCode = $response['error']['details'][0]['errorCode'] ?? null;
+            }
+            
+            // Usar o FCM errorCode se disponível, senão usar o status, senão usar o code
+            $actualErrorCode = $fcmErrorCode ?? $errorStatus ?? (is_string($errorCode) ? $errorCode : null);
+            
+            // Logar resposta completa do erro (mascarando dados sensíveis)
+            $maskedResponse = $this->maskSensitiveData($response);
+            Toolbox::logInFile('glpipwa', "GLPI PWA FCM HTTP Error: " . $httpCode . " - Code: " . $errorCode . " - Status: " . ($errorStatus ?? 'N/A') . " - FCM ErrorCode: " . ($fcmErrorCode ?? 'N/A') . " - Message: " . $errorMessage . " - Resposta completa: " . json_encode($maskedResponse), LOG_ERR);
 
             // Tratar erros específicos
-            switch ($errorCode) {
-                case 'UNAUTHENTICATED':
-                    // Token OAuth2 inválido, limpar cache e tentar novamente uma vez
-                    if ($retryCount === 0) {
-                        PluginGlpipwaFirebaseAuth::clearCache();
-                        $accessToken = PluginGlpipwaFirebaseAuth::getAccessToken();
-                        if ($accessToken) {
-                            // Tentar novamente com novo token
-                            return $this->sendToFCM($message, $token, $retryCount + 1);
-                        }
-                    }
-                    break;
-                
-                case 'NOT_FOUND':
-                case 'UNREGISTERED':
-                    // Token de dispositivo não encontrado ou não registrado
-                    PluginGlpipwaToken::deleteToken($token);
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: Token removido devido a erro FCM: " . $errorCode, LOG_DEBUG);
-                    break;
-                
-                case 'INVALID_ARGUMENT':
-                    // Payload ou token inválido
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: Argumento inválido no payload FCM", LOG_ERR);
-                    break;
-                
-                case 'PERMISSION_DENIED':
-                    // Service Account sem permissões
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: Service Account sem permissões para enviar mensagens FCM", LOG_ERR);
-                    break;
+            // Verificar tanto o errorCode quanto o status e o FCM errorCode
+            $shouldDeleteToken = false;
+            $shouldRetryAuth = false;
+            
+            if ($actualErrorCode === 'UNAUTHENTICATED' || $errorStatus === 'UNAUTHENTICATED') {
+                // Token OAuth2 inválido, limpar cache e tentar novamente uma vez
+                $shouldRetryAuth = true;
+            } elseif ($actualErrorCode === 'UNREGISTERED' || 
+                      $actualErrorCode === 'NOT_FOUND' || 
+                      $errorStatus === 'NOT_FOUND' ||
+                      ($httpCode === 404 && ($errorMessage === 'NotRegistered' || strpos($errorMessage, 'NotRegistered') !== false))) {
+                // Token de dispositivo não encontrado ou não registrado
+                $shouldDeleteToken = true;
+            } elseif ($actualErrorCode === 'INVALID_ARGUMENT' || $errorStatus === 'INVALID_ARGUMENT') {
+                // Payload ou token inválido
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Argumento inválido no payload FCM", LOG_ERR);
+            } elseif ($actualErrorCode === 'PERMISSION_DENIED' || $errorStatus === 'PERMISSION_DENIED') {
+                // Service Account sem permissões
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Service Account sem permissões para enviar mensagens FCM", LOG_ERR);
+            }
+            
+            // Executar ações baseadas nos erros detectados
+            if ($shouldRetryAuth && $retryCount === 0) {
+                PluginGlpipwaFirebaseAuth::clearCache();
+                $accessToken = PluginGlpipwaFirebaseAuth::getAccessToken();
+                if ($accessToken) {
+                    // Tentar novamente com novo token
+                    return $this->sendToFCM($message, $token, $retryCount + 1);
+                }
+            }
+            
+            if ($shouldDeleteToken) {
+                PluginGlpipwaToken::deleteToken($token);
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Token removido devido a erro FCM (UNREGISTERED/NOT_FOUND) - Token: " . substr($token, 0, 20) . "...", LOG_DEBUG);
             }
             
             return false;
         }
 
-        // Sucesso
+        // Validar estrutura da resposta de sucesso
+        // FCM v1 retorna sucesso quando há um campo 'name' com o ID da mensagem
+        if (!isset($response['name']) || empty($response['name'])) {
+            // Verificar se há erro na resposta mesmo com HTTP 200
+            if (isset($response['error'])) {
+                $errorMessage = $response['error']['message'] ?? 'Unknown error';
+                $errorCode = $response['error']['code'] ?? 'UNKNOWN';
+                $maskedResponse = $this->maskSensitiveData($response);
+                Toolbox::logInFile('glpipwa', "GLPI PWA FCM Error: Resposta contém erro mesmo com HTTP 200 - " . $errorCode . " - " . $errorMessage . " - Resposta: " . json_encode($maskedResponse), LOG_ERR);
+                return false;
+            }
+            
+            // Resposta sem estrutura esperada
+            $maskedResponse = $this->maskSensitiveData($response);
+            Toolbox::logInFile('glpipwa', "GLPI PWA FCM Error: Resposta de sucesso sem campo 'name' (HTTP {$httpCode}) - Resposta: " . json_encode($maskedResponse), LOG_ERR);
+            return false;
+        }
+
+        // Sucesso validado - logar resposta (com dados sensíveis mascarados)
+        $maskedResponse = $this->maskSensitiveData($response);
+        Toolbox::logInFile('glpipwa', "GLPI PWA FCM: Mensagem enviada com sucesso - Message ID: " . $response['name'] . " - Resposta: " . json_encode($maskedResponse), LOG_DEBUG);
+
         return $response;
+    }
+
+    /**
+     * Mascara dados sensíveis em arrays para logs
+     * 
+     * @param array $data Dados a serem mascarados
+     * @return array Dados com informações sensíveis mascaradas
+     */
+    private function maskSensitiveData(array $data)
+    {
+        $masked = $data;
+        
+        // Mascarar tokens FCM
+        if (isset($masked['message']['token'])) {
+            $token = $masked['message']['token'];
+            if (strlen($token) > 20) {
+                $masked['message']['token'] = substr($token, 0, 10) . '...' . substr($token, -10);
+            } else {
+                $masked['message']['token'] = '***';
+            }
+        }
+        
+        // Mascarar access tokens
+        if (isset($masked['access_token'])) {
+            $masked['access_token'] = '***';
+        }
+        
+        // Recursivamente mascarar em subarrays
+        foreach ($masked as $key => $value) {
+            if (is_array($value)) {
+                $masked[$key] = $this->maskSensitiveData($value);
+            }
+        }
+        
+        return $masked;
     }
 
     /**

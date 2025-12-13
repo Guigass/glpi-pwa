@@ -265,14 +265,17 @@
     /**
      * Verifica se deve registrar o token FCM baseado no modo de execução
      * 
-     * Regra unificada:
-     * - Registra apenas se o PWA estiver instalado (mobile ou desktop)
-     * - Não registra quando executando no navegador normal
+     * NOTA: Esta função é usada apenas para verificar se deve registrar novamente
+     * quando as condições mudam (ex: PWA instalado/desinstalado).
      * 
-     * @return {boolean} true se deve registrar, false caso contrário
+     * O registro inicial do token sempre acontece quando o token é obtido do Firebase,
+     * independente de estar como PWA ou não, pois o usuário já deu permissão.
+     * 
+     * @return {boolean} true se deve registrar (quando está como PWA), false caso contrário
      */
     function shouldRegisterToken() {
         // Registra apenas se estiver rodando como PWA instalado
+        // Mas o registro inicial sempre acontece quando o token é obtido
         return isPWA();
     }
 
@@ -409,14 +412,17 @@
             // Rastreia as condições quando registra para detectar mudanças futuras
             const checkAndRegisterTokenIfNeeded = (token) => {
                 if (!token) {
+                    console.warn('[GLPI PWA] checkAndRegisterTokenIfNeeded: Token vazio');
                     return;
                 }
 
                 const shouldRegister = shouldRegisterToken();
+
                 const registrationStateKey = 'glpipwa_token_state_' + token;
 
                 try {
                     const storedState = localStorage.getItem(registrationStateKey);
+
                     // storedState contém: "registered|isPWA" ou null
                     // Exemplo: "registered|1" significa: registrado quando era PWA
                     const storedParts = storedState ? storedState.split('|') : [];
@@ -431,22 +437,41 @@
                         // Deve registrar: verificar se precisa fazer registro
                         if (!wasRegistered || conditionsChanged) {
                             // Nunca foi registrado ou condições mudaram (instalou/desinstalou PWA) - registrar
-                            registerToken(token);
-                            // Armazenar estado atual (só precisa saber se é PWA)
-                            const newState = 'registered|' + (currentIsPWA ? '1' : '0');
-                            localStorage.setItem(registrationStateKey, newState);
+                            registerToken(token).then((success) => {
+                                if (success) {
+                                    // Só marcar como registrado se o registro foi bem-sucedido
+                                    const newState = 'registered|' + (currentIsPWA ? '1' : '0');
+                                    localStorage.setItem(registrationStateKey, newState);
+                                } else {
+                                    console.warn('[GLPI PWA] Token não foi registrado com sucesso, não marcando como registrado');
+                                    // Remover flag se existir para tentar novamente na próxima vez
+                                    localStorage.removeItem(registrationStateKey);
+                                }
+                            }).catch((error) => {
+                                console.error('[GLPI PWA] Erro ao registrar token:', error);
+                                // Remover flag se existir para tentar novamente na próxima vez
+                                localStorage.removeItem(registrationStateKey);
+                            });
                         }
                         // Se já estava registrado e condições não mudaram, não precisa fazer nada
                     } else {
-                        // Não deve registrar - limpar flag se existia
+                        // Não deve registrar AGORA (não está como PWA)
+                        // MAS: Se o token já foi registrado anteriormente, manter a flag
+                        // Isso evita tentar registrar novamente toda vez que a página carrega
                         if (wasRegistered) {
-                            localStorage.removeItem(registrationStateKey);
+                            // NÃO remover a flag - o token já foi registrado no servidor
+                            // Apenas atualizar o estado para refletir que não está como PWA agora
+                            const newState = 'registered|' + (currentIsPWA ? '1' : '0');
+                            localStorage.setItem(registrationStateKey, newState);
                         }
                     }
                 } catch (e) {
+                    console.error('[GLPI PWA] Erro ao verificar estado do token:', e);
                     // Se localStorage falhar, tentar registrar mesmo assim se deve registrar
                     if (shouldRegister) {
-                        registerToken(token);
+                        registerToken(token).catch((error) => {
+                            console.error('[GLPI PWA] Erro ao registrar token após falha no localStorage:', error);
+                        });
                     }
                 }
             };
@@ -471,8 +496,28 @@
                         }
                     }
 
-                    // Verificar e registrar se necessário (sempre verifica condições atuais)
-                    checkAndRegisterTokenIfNeeded(currentToken);
+                    // SEMPRE registrar o token quando obtido do Firebase
+                    // Independente de estar como PWA ou não, pois o usuário já deu permissão
+                    const registrationStateKey = 'glpipwa_token_state_' + currentToken;
+                    const storedState = localStorage.getItem(registrationStateKey);
+                    const isRegistered = storedState && storedState.split('|')[0] === 'registered';
+
+                    if (!isRegistered || needsRegistration) {
+                        registerToken(currentToken).then((success) => {
+                            if (success) {
+                                const currentIsPWA = isPWA();
+                                const newState = 'registered|' + (currentIsPWA ? '1' : '0');
+                                localStorage.setItem(registrationStateKey, newState);
+                            } else {
+                                console.warn('[GLPI PWA] processToken: Falha ao registrar token');
+                            }
+                        }).catch((error) => {
+                            console.error('[GLPI PWA] processToken: Erro ao registrar token:', error);
+                        });
+                    } else {
+                        // Token já registrado, apenas verificar se precisa atualizar
+                        checkAndRegisterTokenIfNeeded(currentToken);
+                    }
 
                     return currentToken;
                 } else {
@@ -525,40 +570,72 @@
             if (!forceRefresh) {
                 const storedToken = getStoredFCMToken();
                 if (storedToken && isStoredTokenValid()) {
-                    // Token válido encontrado
                     // IMPORTANTE: Verificar se deve registrar mesmo para token armazenado
                     // Isso garante que se as condições mudaram (ex: PWA instalado), o token será registrado
-                    checkAndRegisterTokenIfNeeded(storedToken);
+                    // Também força o registro se a flag não existir (token nunca foi registrado)
+                    const registrationStateKey = 'glpipwa_token_state_' + storedToken;
+                    const storedState = localStorage.getItem(registrationStateKey);
+                    const isRegistered = storedState && storedState.split('|')[0] === 'registered';
 
-                    // IMPORTANTE: Mesmo com token armazenado, precisamos aguardar o SW estar pronto
-                    // para evitar erros do Firebase ao tentar acessar pushManager
-                    if (!swRegistration) {
-                        // Sem SW, podemos retornar o token armazenado diretamente
-                        return Promise.resolve(storedToken);
-                    }
+                    // Função auxiliar para continuar o fluxo após verificar registro
+                    const continueFlow = () => {
+                        // IMPORTANTE: Mesmo com token armazenado, precisamos aguardar o SW estar pronto
+                        // para evitar erros do Firebase ao tentar acessar pushManager
+                        if (!swRegistration) {
+                            // Sem SW, podemos retornar o token armazenado diretamente
+                            return Promise.resolve(storedToken);
+                        }
 
-                    // Com SW, aguardar estar pronto antes de retornar
-                    // Isso evita erros do Firebase ao tentar acessar pushManager de undefined
-                    return waitForServiceWorkerActive(swRegistration)
-                        .then(() => {
-                            // SW está pronto, verificar novamente se deve registrar (pode ter mudado durante a espera)
-                            checkAndRegisterTokenIfNeeded(storedToken);
-                            return storedToken;
-                        })
-                        .catch((error) => {
-                            // Se houver erro ao aguardar SW, tentar obter token do Firebase
-                            console.warn('[GLPI PWA] Erro ao aguardar SW, tentando obter token do Firebase:', error);
-                            const tokenOptions = {
-                                vapidKey: vapidKey
-                            };
-                            return messaging.getToken(tokenOptions)
-                                .then(processToken)
-                                .catch(() => {
-                                    // Se falhar, verificar se deve registrar o token armazenado
-                                    checkAndRegisterTokenIfNeeded(storedToken);
-                                    return storedToken;
-                                });
+                        // Com SW, aguardar estar pronto antes de retornar
+                        // Isso evita erros do Firebase ao tentar acessar pushManager de undefined
+                        return waitForServiceWorkerActive(swRegistration)
+                            .then(() => {
+                                // SW está pronto, verificar novamente se deve registrar (pode ter mudado durante a espera)
+                                checkAndRegisterTokenIfNeeded(storedToken);
+                                return storedToken;
+                            })
+                            .catch((error) => {
+                                // Se houver erro ao aguardar SW, tentar obter token do Firebase
+                                console.warn('[GLPI PWA] Erro ao aguardar SW, tentando obter token do Firebase:', error);
+                                const tokenOptions = {
+                                    vapidKey: vapidKey
+                                };
+                                return messaging.getToken(tokenOptions)
+                                    .then(processToken)
+                                    .catch(() => {
+                                        // Se falhar, verificar se deve registrar o token armazenado
+                                        checkAndRegisterTokenIfNeeded(storedToken);
+                                        return storedToken;
+                                    });
+                            });
+                    };
+
+                    if (!isRegistered) {
+                        // Se o token não está registrado, tentar registrar mesmo que não esteja como PWA
+                        // Isso garante que tokens existentes sejam registrados no servidor
+                        // IMPORTANTE: Aguardar o registro antes de continuar
+                        return registerToken(storedToken).then((success) => {
+                            if (success) {
+                                const currentIsPWA = isPWA();
+                                const newState = 'registered|' + (currentIsPWA ? '1' : '0');
+                                localStorage.setItem(registrationStateKey, newState);
+                            } else {
+                                console.warn('[GLPI PWA] Falha ao registrar token existente no localStorage - tentando novamente na próxima vez');
+                                // Não remover a flag aqui, deixar para tentar novamente
+                            }
+                            // Continuar o fluxo normalmente após tentar registrar
+                            return continueFlow();
+                        }).catch((error) => {
+                            console.error('[GLPI PWA] Erro ao registrar token existente:', error);
+                            // Continuar mesmo com erro, retornando o token armazenado
+                            return continueFlow();
                         });
+                    } else {
+                        // Token já está marcado como registrado, verificar se precisa atualizar
+                        checkAndRegisterTokenIfNeeded(storedToken);
+                        // Continuar o fluxo normalmente
+                        return continueFlow();
+                    }
                 }
             }
 
@@ -694,9 +771,49 @@
                 // Erro ao solicitar permissão - silenciosamente ignora
             });
 
-        // Nota: Na API v9 compat, onMessage não está disponível da mesma forma
-        // As mensagens em foreground são tratadas pelo Service Worker
-        // O Service Worker exibirá as notificações automaticamente
+        // Listener para mensagens em foreground
+        // IMPORTANTE: Quando o app está em foreground, mensagens com campo 'notification'
+        // chamam onMessage aqui (não no Service Worker). O onBackgroundMessage só é chamado
+        // quando o app está em background E a mensagem NÃO tem campo 'notification'
+        try {
+            messaging.onMessage((payload) => {
+                // Exibir notificação mesmo com app aberto
+                if (payload.notification && Notification.permission === 'granted') {
+                    const notificationTitle = payload.notification.title || 'GLPI';
+                    const notificationBody = payload.notification.body || '';
+
+                    // Criar tag único similar ao Service Worker
+                    const ticketId = payload.data?.ticket_id || 'notification';
+                    const timestamp = Date.now();
+                    const randomStr = Math.random().toString(36).substr(2, 9);
+                    const notificationTag = payload.data?.notification_id ||
+                        `glpi-${ticketId}-${timestamp}-${randomStr}`;
+
+                    const notificationOptions = {
+                        body: notificationBody,
+                        icon: payload.notification.icon || '/pics/glpi.png?v1',
+                        badge: '/pics/glpi.png?v1',
+                        data: payload.data || {},
+                        tag: notificationTag,
+                        requireInteraction: false,
+                        timestamp: timestamp,
+                    };
+
+                    try {
+                        new Notification(notificationTitle, notificationOptions);
+                    } catch (error) {
+                        console.error('[GLPI PWA] Erro ao exibir notificação em foreground', error);
+                    }
+                } else {
+                    console.warn('[GLPI PWA] Mensagem em foreground sem notification ou sem permissão', {
+                        hasNotification: !!payload.notification,
+                        permission: Notification.permission
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('[GLPI PWA] Erro ao registrar onMessage', error);
+        }
     }
 
     /**
@@ -738,17 +855,20 @@
      * 
      * NOTA: A verificação se o token precisa ser registrado é feita ANTES de chamar esta função,
      * em processToken() ou no fluxo de token armazenado. Esta função sempre tenta registrar.
+     * 
+     * @param {string} token Token FCM para registrar
+     * @return {Promise<boolean>} Promise que resolve com true se o registro foi bem-sucedido, false caso contrário
      */
     function registerToken(token) {
         if (!token || typeof token !== 'string' || token.length === 0) {
             console.error('[GLPI PWA] Token inválido para registro');
-            return;
+            return Promise.resolve(false);
         }
 
         const pluginUrl = getPluginUrl();
 
         // Primeiro obter token CSRF fresco
-        getNewCSRFToken()
+        return getNewCSRFToken()
             .then((csrfToken) => {
                 const data = {
                     token: token,
@@ -774,29 +894,52 @@
                     body: JSON.stringify(data)
                 });
             })
+            .catch((error) => {
+                console.error('[GLPI PWA] registerToken: Erro ao obter token CSRF:', error);
+                throw error;
+            })
             .then((response) => {
                 if (!response.ok) {
                     // Tentar obter detalhes do erro
-                    return response.json().then((errorData) => {
-                        const errorMessage = errorData.error || errorData.message || response.statusText;
-                        console.error('[GLPI PWA] Erro ao registrar token:', response.status, errorMessage);
-                        throw new Error(errorMessage);
-                    }).catch((parseError) => {
-                        // Se não conseguir parsear JSON, usar statusText
-                        console.error('[GLPI PWA] Erro ao registrar token:', response.status, response.statusText);
-                        throw new Error('Erro ' + response.status + ': ' + response.statusText);
+                    return response.text().then((text) => {
+                        console.error('[GLPI PWA] registerToken: Resposta de erro (texto):', text);
+                        try {
+                            const errorData = JSON.parse(text);
+                            const errorMessage = errorData.error || errorData.message || response.statusText;
+                            console.error('[GLPI PWA] Erro ao registrar token:', response.status, errorMessage);
+                            throw new Error(errorMessage);
+                        } catch (parseError) {
+                            // Se não conseguir parsear JSON, usar statusText
+                            console.error('[GLPI PWA] Erro ao registrar token:', response.status, response.statusText);
+                            console.error('[GLPI PWA] Resposta completa:', text);
+                            throw new Error('Erro ' + response.status + ': ' + response.statusText);
+                        }
                     });
                 }
-                return response.json();
+                return response.text().then((text) => {
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error('[GLPI PWA] registerToken: Erro ao parsear JSON:', e, 'Texto:', text);
+                        throw new Error('Resposta inválida do servidor');
+                    }
+                });
             })
             .then((result) => {
-                if (!result || !result.success) {
-                    console.error('[GLPI PWA] Falha ao registrar token no servidor');
+                if (result && result.success) {
+                    return true;
+                } else {
+                    const errorMsg = result?.error || result?.message || 'Resposta sem sucesso';
+                    console.error('[GLPI PWA] Falha ao registrar token no servidor - resposta:', result);
+                    console.error('[GLPI PWA] Mensagem de erro:', errorMsg);
+                    return false;
                 }
             })
             .catch((error) => {
                 console.error('[GLPI PWA] Erro ao registrar token no servidor:', error);
-                // Não fazer throw para não interromper o fluxo
+                console.error('[GLPI PWA] Mensagem:', error.message);
+                // Não fazer throw para não interromper o fluxo, mas retornar false
+                return false;
             });
     }
 

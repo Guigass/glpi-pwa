@@ -129,18 +129,27 @@ if (!preg_match('/^[a-zA-Z0-9_:\-]+$/', $token)) {
 $user_agent = isset($data['user_agent']) ? substr(trim($data['user_agent']), 0, 255) : ($_SERVER['HTTP_USER_AGENT'] ?? null);
 $users_id = Session::getLoginUserID();
 
+// Log para debug
+Toolbox::logInFile('glpipwa', "GLPI PWA register.php: Tentando registrar token para users_id: {$users_id}", LOG_DEBUG);
+
 // Registrar token
 try {
     $result = PluginGlpipwaToken::addToken($users_id, $token, $user_agent);
 
     if ($result) {
+        Toolbox::logInFile('glpipwa', "GLPI PWA register.php: Token registrado com sucesso (ID: {$result}, users_id: {$users_id})", LOG_DEBUG);
         echo json_encode(['success' => true, 'message' => 'Token registrado com sucesso']);
     } else {
+        Toolbox::logInFile('glpipwa', "GLPI PWA register.php: Falha ao registrar token (users_id: {$users_id}) - addToken retornou false", LOG_ERR);
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erro ao registrar token']);
     }
 } catch (Exception $e) {
-    Toolbox::logInFile('glpipwa', 'GLPIPWA: Erro ao registrar token: ' . $e->getMessage(), LOG_ERR);
+    Toolbox::logInFile('glpipwa', 'GLPI PWA register.php: Exceção ao registrar token: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString(), LOG_ERR);
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Erro interno do servidor']);
+} catch (Throwable $e) {
+    Toolbox::logInFile('glpipwa', 'GLPI PWA register.php: Erro fatal ao registrar token: ' . $e->getMessage() . ' - Trace: ' . $e->getTraceAsString(), LOG_ERR);
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Erro interno do servidor']);
 }

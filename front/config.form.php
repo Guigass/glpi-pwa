@@ -44,12 +44,26 @@ if (!Session::haveRight('config', UPDATE)) {
 
 // Processar remoção de token individual
 if (isset($_POST['delete_token']) && isset($_POST['token_id'])) {
+    // Validar CSRF token - seguir padrão do notification.php
+    $csrf_token = $_POST['_glpi_csrf_token'] ?? '';
+    if (empty($csrf_token) || !Session::validateCSRF(['_glpi_csrf_token' => $csrf_token])) {
+        Session::addMessageAfterRedirect(__('Invalid security token', 'glpipwa'), true, ERROR);
+        Html::redirect($plugin_url . '?tab=tokens');
+        exit;
+    }
+    
     $token_id = (int)$_POST['token_id'];
     if ($token_id > 0) {
-        if (PluginGlpipwaToken::deleteTokenById($token_id)) {
-            Session::addMessageAfterRedirect(__('Token removed successfully', 'glpipwa'), true, INFO);
-        } else {
-            Session::addMessageAfterRedirect(__('Error removing token', 'glpipwa'), true, ERROR);
+        try {
+            if (PluginGlpipwaToken::deleteTokenById($token_id)) {
+                Session::addMessageAfterRedirect(__('Token removed successfully', 'glpipwa'), true, INFO);
+            } else {
+                Session::addMessageAfterRedirect(__('Error removing token', 'glpipwa'), true, ERROR);
+            }
+        } catch (Exception $e) {
+            Session::addMessageAfterRedirect(__('Error removing token', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+        } catch (Throwable $e) {
+            Session::addMessageAfterRedirect(__('Error removing token', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
         }
     }
     Html::redirect($plugin_url . '?tab=tokens');
@@ -58,11 +72,25 @@ if (isset($_POST['delete_token']) && isset($_POST['token_id'])) {
 
 // Processar remoção de todos os tokens
 if (isset($_POST['delete_all_tokens'])) {
-    $deleted = PluginGlpipwaToken::deleteAllTokens();
-    if ($deleted > 0) {
-        Session::addMessageAfterRedirect(__('All tokens removed successfully', 'glpipwa'), true, INFO);
-    } else {
-        Session::addMessageAfterRedirect(__('No tokens to remove', 'glpipwa'), true, INFO);
+    // Validar CSRF token - seguir padrão do notification.php
+    $csrf_token = $_POST['_glpi_csrf_token'] ?? '';
+    if (empty($csrf_token) || !Session::validateCSRF(['_glpi_csrf_token' => $csrf_token])) {
+        Session::addMessageAfterRedirect(__('Invalid security token', 'glpipwa'), true, ERROR);
+        Html::redirect($plugin_url . '?tab=tokens');
+        exit;
+    }
+    
+    try {
+        $deleted = PluginGlpipwaToken::deleteAllTokens();
+        if ($deleted > 0) {
+            Session::addMessageAfterRedirect(__('All tokens removed successfully', 'glpipwa'), true, INFO);
+        } else {
+            Session::addMessageAfterRedirect(__('No tokens to remove', 'glpipwa'), true, INFO);
+        }
+    } catch (Exception $e) {
+        Session::addMessageAfterRedirect(__('Error removing tokens', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
+    } catch (Throwable $e) {
+        Session::addMessageAfterRedirect(__('Error removing tokens', 'glpipwa') . ': ' . $e->getMessage(), true, ERROR);
     }
     Html::redirect($plugin_url . '?tab=tokens');
     exit;
@@ -481,7 +509,8 @@ if ($active_tab === 'tokens') {
         // Botão remover todos
         echo "<tr class='tab_bg_2'>";
         echo "<td colspan='6' class='center'>";
-        echo "<form method='post' action='" . $plugin_url . "?tab=tokens' style='display:inline;'>";
+        echo "<form method='post' action='" . htmlspecialchars($plugin_url . '?tab=tokens') . "' style='display:inline;'>";
+        echo "<input type='hidden' name='_glpi_csrf_token' value='" . htmlspecialchars(Session::getNewCSRFToken()) . "'>";
         echo "<input type='hidden' name='delete_all_tokens' value='1'>";
         echo "<input type='submit' value='" . __('Remove All Tokens', 'glpipwa') . "' class='submit' onclick=\"return confirm('" . __('Are you sure you want to remove all tokens?', 'glpipwa') . "');\">";
         echo "</form>";
@@ -533,7 +562,8 @@ if ($active_tab === 'tokens') {
             echo "<td>$formatted_date</td>";
             echo "<td>" . htmlspecialchars($user_agent) . "</td>";
             echo "<td class='center'>";
-            echo "<form method='post' action='" . $plugin_url . "?tab=tokens' style='display:inline;'>";
+            echo "<form method='post' action='" . htmlspecialchars($plugin_url . '?tab=tokens') . "' style='display:inline;'>";
+            echo "<input type='hidden' name='_glpi_csrf_token' value='" . htmlspecialchars(Session::getNewCSRFToken()) . "'>";
             echo "<input type='hidden' name='token_id' value='$token_id'>";
             echo "<input type='submit' name='delete_token' value='" . __('Remove', 'glpipwa') . "' class='submit'>";
             echo "</form>";

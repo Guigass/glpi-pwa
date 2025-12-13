@@ -64,37 +64,75 @@ class PluginGlpipwaToken extends CommonDBTM
     {
         global $DB;
 
-        // Verificar se o token já existe
-        $existing = new self();
-        if ($existing->getFromDBByCrit(['token' => $token])) {
-            // Atualizar data de modificação e usuário se necessário
+        try {
+            // Validar parâmetros
+            if (empty($users_id) || !is_numeric($users_id) || (int)$users_id <= 0) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - users_id inválido: " . var_export($users_id, true), LOG_ERR);
+                return false;
+            }
+
+            if (empty($token) || !is_string($token)) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - token inválido", LOG_ERR);
+                return false;
+            }
+
+            $users_id = (int)$users_id;
+
+            // Verificar se o token já existe
+            $existing = new self();
+            if ($existing->getFromDBByCrit(['token' => $token])) {
+                // Atualizar data de modificação e usuário se necessário
+                $current_time = isset($_SESSION['glpi_currenttime']) ? $_SESSION['glpi_currenttime'] : date('Y-m-d H:i:s');
+                $input = [
+                    'id' => $existing->getID(),
+                    'date_mod' => $current_time,
+                ];
+                if ($user_agent !== null) {
+                    $input['user_agent'] = $user_agent;
+                }
+                if ($existing->getField('users_id') != $users_id) {
+                    $input['users_id'] = $users_id;
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Atualizando token existente (ID: {$existing->getID()}) para usuário {$users_id}", LOG_DEBUG);
+                } else {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Token já existe e pertence ao mesmo usuário (ID: {$existing->getID()}, users_id: {$users_id})", LOG_DEBUG);
+                }
+                
+                $result = $existing->update($input);
+                if ($result) {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Token atualizado com sucesso (ID: {$existing->getID()})", LOG_DEBUG);
+                    return $existing->getID();
+                } else {
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Falha ao atualizar token existente (ID: {$existing->getID()})", LOG_ERR);
+                    return false;
+                }
+            }
+
+            // Criar novo token
+            $tokenObj = new self();
             $current_time = isset($_SESSION['glpi_currenttime']) ? $_SESSION['glpi_currenttime'] : date('Y-m-d H:i:s');
             $input = [
-                'id' => $existing->getID(),
+                'users_id' => $users_id,
+                'token' => $token,
+                'user_agent' => $user_agent,
+                'date_creation' => $current_time,
                 'date_mod' => $current_time,
             ];
-            if ($user_agent !== null) {
-                $input['user_agent'] = $user_agent;
+
+            $result = $tokenObj->add($input);
+            if ($result) {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Novo token criado com sucesso (ID: {$result}, users_id: {$users_id})", LOG_DEBUG);
+                return $result;
+            } else {
+                Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Falha ao criar novo token (users_id: {$users_id})", LOG_ERR);
+                return false;
             }
-            if ($existing->getField('users_id') != $users_id) {
-                $input['users_id'] = $users_id;
-            }
-            $existing->update($input);
-            return $existing->getID();
+        } catch (Exception $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Exceção: " . $e->getMessage(), LOG_ERR);
+            return false;
+        } catch (Throwable $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Erro fatal: " . $e->getMessage(), LOG_ERR);
+            return false;
         }
-
-        // Criar novo token
-        $tokenObj = new self();
-        $current_time = isset($_SESSION['glpi_currenttime']) ? $_SESSION['glpi_currenttime'] : date('Y-m-d H:i:s');
-        $input = [
-            'users_id' => $users_id,
-            'token' => $token,
-            'user_agent' => $user_agent,
-            'date_creation' => $current_time,
-            'date_mod' => $current_time,
-        ];
-
-        return $tokenObj->add($input);
     }
 
     /**
@@ -256,11 +294,35 @@ class PluginGlpipwaToken extends CommonDBTM
      */
     public static function deleteTokenById($id)
     {
-        $tokenObj = new self();
-        if ($tokenObj->getFromDB($id)) {
-            return $tokenObj->delete(['id' => $id]);
+        global $DB;
+        
+        try {
+            $id = (int)$id;
+            if ($id <= 0) {
+                return false;
+            }
+            
+            // Tentar usar o método delete do CommonDBTM primeiro
+            $tokenObj = new self();
+            if ($tokenObj->getFromDB($id)) {
+                $result = $tokenObj->delete(['id' => $id]);
+                if ($result) {
+                    return true;
+                }
+            }
+            
+            // Se falhar, usar SQL direto como fallback
+            $table = self::getTable();
+            $result = $DB->delete($table, ['id' => $id]);
+            
+            return $result !== false;
+        } catch (Exception $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao remover token ID $id - " . $e->getMessage(), LOG_ERR);
+            return false;
+        } catch (Throwable $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao remover token ID $id - " . $e->getMessage(), LOG_ERR);
+            return false;
         }
-        return false;
     }
 
     /**
@@ -270,19 +332,58 @@ class PluginGlpipwaToken extends CommonDBTM
     {
         global $DB;
 
-        $iterator = $DB->request([
-            'FROM' => self::getTable(),
-        ]);
-
-        $deleted = 0;
-        foreach ($iterator as $row) {
-            $token = new self();
-            if ($token->delete(['id' => $row['id']])) {
-                $deleted++;
+        try {
+            $table = self::getTable();
+            
+            // Contar tokens antes de deletar
+            $count_iterator = $DB->request([
+                'COUNT' => 'id',
+                'FROM' => $table,
+            ]);
+            $total_count = 0;
+            foreach ($count_iterator as $row) {
+                $total_count = (int)$row['COUNT'];
+                break;
             }
-        }
+            
+            if ($total_count === 0) {
+                return 0;
+            }
+            
+            // Tentar usar SQL direto para remover todos de uma vez (mais eficiente)
+            $result = $DB->delete($table, []);
+            
+            if ($result !== false) {
+                return $total_count;
+            }
+            
+            // Se falhar, tentar remover um por um usando CommonDBTM
+            $deleted = 0;
+            $iterator = $DB->request([
+                'FROM' => $table,
+            ]);
 
-        return $deleted;
+            foreach ($iterator as $row) {
+                $token = new self();
+                if ($token->getFromDB($row['id'])) {
+                    if ($token->delete(['id' => $row['id']])) {
+                        $deleted++;
+                    } else {
+                        // Fallback: SQL direto
+                        $DB->delete($table, ['id' => $row['id']]);
+                        $deleted++;
+                    }
+                }
+            }
+
+            return $deleted;
+        } catch (Exception $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro ao remover todos os tokens - " . $e->getMessage(), LOG_ERR);
+            return 0;
+        } catch (Throwable $e) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Erro fatal ao remover todos os tokens - " . $e->getMessage(), LOG_ERR);
+            return 0;
+        }
     }
 }
 

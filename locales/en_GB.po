@@ -625,6 +625,9 @@ msgstr "No tokens to remove"
 msgid "Error loading tokens"
 msgstr "Error loading tokens"
 
+msgid "Error removing tokens"
+msgstr "Error removing tokens"
+
 msgid "Tokens will appear here when users register their devices for push notifications."
 msgstr "Tokens will appear here when users register their devices for push notifications."
 
