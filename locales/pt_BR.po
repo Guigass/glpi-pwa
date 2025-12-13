@@ -749,8 +749,76 @@ msgid "Are you sure you want to remove all tokens?"
 msgstr "Tem certeza de que deseja remover todos os tokens?"
 
 #: front/config.form.php
+msgid "Devices"
+msgstr "Dispositivos"
+
+#: front/config.form.php
+msgid "Registered Devices"
+msgstr "Dispositivos Registrados"
+
+#: front/config.form.php
+msgid "No devices registered"
+msgstr "Nenhum dispositivo registrado"
+
+#: front/config.form.php
+msgid "Remove All Devices"
+msgstr "Remover Todos os Dispositivos"
+
+#: front/config.form.php
+msgid "Device removed successfully"
+msgstr "Dispositivo removido com sucesso"
+
+#: front/config.form.php
+msgid "All devices removed successfully"
+msgstr "Todos os dispositivos removidos com sucesso"
+
+#: front/config.form.php
+msgid "No devices to remove"
+msgstr "Nenhum dispositivo para remover"
+
+#: front/config.form.php
+msgid "Error removing device"
+msgstr "Erro ao remover dispositivo"
+
+#: front/config.form.php
+msgid "Error removing devices"
+msgstr "Erro ao remover dispositivos"
+
+#: front/config.form.php
+msgid "Error loading devices"
+msgstr "Erro ao carregar dispositivos"
+
+#: front/config.form.php
+msgid "Are you sure you want to remove all devices?"
+msgstr "Tem certeza de que deseja remover todos os dispositivos?"
+
+#: front/config.form.php
+msgid "Devices will appear here when users register their devices for push notifications."
+msgstr "Os dispositivos aparecerão aqui quando os usuários registrarem seus dispositivos para notificações push."
+
+#: front/config.form.php
 msgid "User"
 msgstr "Usuário"
+
+#: front/config.form.php
+msgid "Device ID"
+msgstr "ID do Dispositivo"
+
+#: front/config.form.php
+msgid "FCM Token"
+msgstr "Token FCM"
+
+#: front/config.form.php
+msgid "Platform"
+msgstr "Plataforma"
+
+#: front/config.form.php
+msgid "Last Seen"
+msgstr "Última Visualização"
+
+#: front/config.form.php
+msgid "Never"
+msgstr "Nunca"
 
 #: front/config.form.php
 msgid "Creation Date"

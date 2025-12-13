@@ -604,8 +604,59 @@ msgstr "Error removing token"
 msgid "Are you sure you want to remove all tokens?"
 msgstr "Are you sure you want to remove all tokens?"
 
+msgid "Devices"
+msgstr "Devices"
+
+msgid "Registered Devices"
+msgstr "Registered Devices"
+
+msgid "No devices registered"
+msgstr "No devices registered"
+
+msgid "Remove All Devices"
+msgstr "Remove All Devices"
+
+msgid "Device removed successfully"
+msgstr "Device removed successfully"
+
+msgid "All devices removed successfully"
+msgstr "All devices removed successfully"
+
+msgid "No devices to remove"
+msgstr "No devices to remove"
+
+msgid "Error removing device"
+msgstr "Error removing device"
+
+msgid "Error removing devices"
+msgstr "Error removing devices"
+
+msgid "Error loading devices"
+msgstr "Error loading devices"
+
+msgid "Are you sure you want to remove all devices?"
+msgstr "Are you sure you want to remove all devices?"
+
+msgid "Devices will appear here when users register their devices for push notifications."
+msgstr "Devices will appear here when users register their devices for push notifications."
+
 msgid "User"
 msgstr "User"
+
+msgid "Device ID"
+msgstr "Device ID"
+
+msgid "FCM Token"
+msgstr "FCM Token"
+
+msgid "Platform"
+msgstr "Platform"
+
+msgid "Last Seen"
+msgstr "Last Seen"
+
+msgid "Never"
+msgstr "Never"
 
 msgid "Creation Date"
 msgstr "Creation Date"
