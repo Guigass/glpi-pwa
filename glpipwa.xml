@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <glpiplugin>
     <name>GLPI PWA</name>
-    <version>1.0.6</version>
-    <author>GLPI Community</author>
+    <version>1.1.0</version>
+    <author>Guilherme Gentile</author>
     <license>GPL-2.0-or-later</license>
     <homepage>https://github.com/glpi-project/glpi-pwa</homepage>
     <requirements>

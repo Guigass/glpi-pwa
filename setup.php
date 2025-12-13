@@ -30,7 +30,7 @@
  * ---------------------------------------------------------------------
  */
 
-define('PLUGIN_GLPIPWA_VERSION', '1.0.6');
+define('PLUGIN_GLPIPWA_VERSION', '1.1.0');
 
 /**
  * Carrega as classes do plugin quando necessário
@@ -162,7 +162,7 @@ function plugin_init_glpipwa() {
 function plugin_version_glpipwa() {
     // Garantir que a versão está definida
     if (!defined('PLUGIN_GLPIPWA_VERSION')) {
-        define('PLUGIN_GLPIPWA_VERSION', '1.0.6');
+        define('PLUGIN_GLPIPWA_VERSION', '1.1.0');
     }
     
     // Não usar __() aqui pois pode não estar disponível quando o plugin é carregado
