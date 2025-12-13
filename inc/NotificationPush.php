@@ -50,125 +50,178 @@ class PluginGlpipwaNotificationPush
             $dataStrings[$key] = (string)$value;
         }
 
+        // Obter ticket_id para tag e collapse_key
+        $ticket_id = isset($data['ticket_id']) ? (string)$data['ticket_id'] : null;
+        
+        // Determinar TTL baseado no tipo de evento
+        // TTL curto (10 minutos) para tickets/interações, maior para eventos críticos
+        $ttl = 600; // 10 minutos padrão
+        $eventType = isset($data['type']) ? $data['type'] : '';
+        if (in_array($eventType, ['validation_requested', 'validation_added'])) {
+            $ttl = 21600; // 6 horas para validações
+        }
+
+        // ESTRATÉGIA DATA-ONLY: Não enviar message.notification para evitar duplicação
+        // O FCM exibe automaticamente notificações quando message.notification está presente,
+        // e o Service Worker também exibe via showNotification(), causando duplicação.
+        // Com data-only, apenas o Service Worker exibe a notificação, garantindo controle total.
+        // Referência: https://firebase.google.com/docs/cloud-messaging/concept-options#notifications_and_data_messages
+        
+        // Adicionar title e body em data para o Service Worker usar
+        $dataStrings['title'] = (string)$title;
+        $dataStrings['body'] = (string)$body;
+
         $message = [
             'message' => [
                 'token' => $token,
-                'notification' => [
-                    'title' => $title,
-                    'body' => $body,
-                ],
+                // NOTA: message.notification foi removido - usar apenas message.data
                 'data' => $dataStrings,
             ],
         ];
+
+        // Adicionar tag para substituição de notificações (Web Push)
+        if ($ticket_id) {
+            $tag = "ticket-{$ticket_id}";
+            // Tag é usado no Service Worker para deduplicação de notificações do mesmo ticket
+            $message['message']['data']['tag'] = $tag;
+        }
+
+        // Adicionar TTL e collapse_key para Android
+        if ($ticket_id) {
+            $collapseKey = "ticket-{$ticket_id}";
+            $message['message']['android'] = [
+                'ttl' => $ttl . 's',
+                'collapse_key' => $collapseKey,
+            ];
+        } else {
+            $message['message']['android'] = [
+                'ttl' => $ttl . 's',
+            ];
+        }
+
+        // Adicionar apns-collapse-id para iOS
+        if ($ticket_id) {
+            $collapseId = "ticket-{$ticket_id}";
+            $message['message']['apns'] = [
+                'headers' => [
+                    'apns-collapse-id' => $collapseId,
+                ],
+            ];
+        }
+
+        // Adicionar TTL para Web Push
+        $message['message']['webpush'] = [
+            'headers' => [
+                'TTL' => (string)$ttl,
+                'Urgency' => 'normal',
+            ],
+        ];
+
+        // Adicionar link se disponível
+        if (isset($data['url'])) {
+            $message['message']['webpush']['fcm_options'] = [
+                'link' => $data['url'],
+            ];
+        }
 
         return $this->sendToFCM($message, $token);
     }
 
     /**
      * Envia notificação para todos os tokens de um usuário
+     * @deprecated Use sendToUsers() que agora usa dispositivos
      */
     public function sendToUser($users_id, $title, $body, $data = [])
     {
-        $tokens = PluginGlpipwaToken::getUserTokens($users_id);
-        
-        if (empty($tokens)) {
-            return false;
-        }
-
-        $totalTokens = count($tokens);
-
-        $results = [];
-        $successCount = 0;
-        $failureCount = 0;
-        $firstToken = true;
-
-        foreach ($tokens as $token) {
-            // Adicionar delay de 100ms entre requisições para evitar rate limiting (exceto na primeira)
-            if (!$firstToken) {
-                usleep(100000); // 100ms em microsegundos
-            }
-            $firstToken = false;
-
-            try {
-                $result = $this->send($token, $title, $body, $data);
-                $results[] = $result;
-                
-                if ($result !== false) {
-                    $successCount++;
-                } else {
-                    $failureCount++;
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: Falha ao enviar notificação para token (usuário ID: {$users_id})", LOG_WARNING);
-                }
-            } catch (Exception $e) {
-                $failureCount++;
-                $results[] = false;
-                Toolbox::logInFile('glpipwa', "GLPI PWA: Exceção ao enviar notificação para token (usuário ID: {$users_id}): " . $e->getMessage(), LOG_ERR);
-            }
-        }
-
-        return $results;
+        return $this->sendToUsers([$users_id], $title, $body, $data);
     }
 
     /**
      * Envia notificação para múltiplos usuários
+     * Agora usa dispositivos e verifica last_seen_at antes de enviar
      */
     public function sendToUsers(array $users_ids, $title, $body, $data = [])
     {
-        // Filtrar e validar IDs de usuários antes de buscar tokens
+        // Filtrar e validar IDs de usuários
         $valid_users_ids = $this->filterValidUserIds($users_ids);
         
         if (empty($valid_users_ids)) {
             Toolbox::logInFile('glpipwa', "GLPI PWA: Nenhum ID de usuário válido fornecido. IDs originais: " . implode(', ', $users_ids), LOG_DEBUG);
             return false;
         }
-        
-        $usersTokens = PluginGlpipwaToken::getUsersTokens($valid_users_ids);
-        
-        if (empty($usersTokens)) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA: Nenhum token encontrado para os usuários: " . implode(', ', $valid_users_ids), LOG_DEBUG);
+
+        // Obter ticket_id e ticket_date_mod do payload para verificação
+        // IMPORTANTE: O GLPI atualiza ticket.date_mod automaticamente em todos os eventos:
+        // - item_add (novo ticket)
+        // - item_update (atualização de ticket)
+        // - followup_add (novo follow-up)
+        // - task_add (nova tarefa)
+        // - validation_add/update (validações)
+        // Portanto, sempre buscamos o valor atual do banco para garantir precisão
+        $ticket_id = isset($data['ticket_id']) ? (int)$data['ticket_id'] : null;
+        $ticket_date_mod = null;
+
+        if ($ticket_id) {
+            // Buscar ticket para obter date_mod atualizado
+            // O GLPI garante que date_mod é atualizado antes dos hooks serem chamados
+            $ticket = new Ticket();
+            if ($ticket->getFromDB($ticket_id)) {
+                $ticket_date_mod = $ticket->getField('date_mod');
+            }
+        }
+
+        // Se não temos ticket_id ou date_mod, usar timestamp atual (comportamento seguro)
+        // Isso só acontece em casos raros onde não há ticket associado
+        if (!$ticket_date_mod) {
+            $ticket_date_mod = date('Y-m-d H:i:s');
+        }
+
+        // Buscar dispositivos que devem receber notificação
+        // getDevicesForNotification já filtra por last_seen_at e last_seen_ticket_id
+        $devices = PluginGlpipwaDevice::getDevicesForNotification($valid_users_ids, $ticket_id, $ticket_date_mod);
+
+        if (empty($devices)) {
+            Toolbox::logInFile('glpipwa', "GLPI PWA: Nenhum dispositivo encontrado que deve receber notificação para os usuários: " . implode(', ', $valid_users_ids), LOG_DEBUG);
             return false;
         }
 
-        $totalUsers = count($usersTokens);
-        $totalTokens = 0;
-        foreach ($usersTokens as $tokens) {
-            $totalTokens += count($tokens);
-        }
-        Toolbox::logInFile('glpipwa', "GLPI PWA: Enviando notificação para {$totalUsers} usuário(s) - Total de tokens: {$totalTokens}", LOG_DEBUG);
+        $totalDevices = count($devices);
+        Toolbox::logInFile('glpipwa', "GLPI PWA: Enviando notificação para {$totalDevices} dispositivo(s) de " . count($valid_users_ids) . " usuário(s)", LOG_DEBUG);
 
         $results = [];
         $successCount = 0;
         $failureCount = 0;
-        $firstToken = true;
+        $firstDevice = true;
 
-        foreach ($usersTokens as $users_id => $tokens) {
-            foreach ($tokens as $token) {
-                // Adicionar delay de 100ms entre requisições para evitar rate limiting (exceto na primeira)
-                if (!$firstToken) {
-                    usleep(100000); // 100ms em microsegundos
-                }
-                $firstToken = false;
+        foreach ($devices as $device) {
+            // Adicionar delay de 100ms entre requisições para evitar rate limiting (exceto na primeira)
+            if (!$firstDevice) {
+                usleep(100000); // 100ms em microsegundos
+            }
+            $firstDevice = false;
 
-                try {
-                    $result = $this->send($token, $title, $body, $data);
-                    $results[] = $result;
-                    
-                    if ($result !== false) {
-                        $successCount++;
-                        Toolbox::logInFile('glpipwa', "GLPI PWA: Notificação enviada com sucesso para token (usuário ID: {$users_id})", LOG_DEBUG);
-                    } else {
-                        $failureCount++;
-                        Toolbox::logInFile('glpipwa', "GLPI PWA: Falha ao enviar notificação para token (usuário ID: {$users_id})", LOG_WARNING);
-                    }
-                } catch (Exception $e) {
+            try {
+                // Adicionar device_id ao payload para uso no Service Worker (tag)
+                $deviceData = $data;
+                $deviceData['device_id'] = $device['device_id'];
+
+                $result = $this->send($device['fcm_token'], $title, $body, $deviceData);
+                $results[] = $result;
+                
+                if ($result !== false) {
+                    $successCount++;
+                } else {
                     $failureCount++;
-                    $results[] = false;
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: Exceção ao enviar notificação para token (usuário ID: {$users_id}): " . $e->getMessage(), LOG_ERR);
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: Falha ao enviar notificação para dispositivo (users_id: {$device['users_id']}, device_id: {$device['device_id']})", LOG_WARNING);
                 }
+            } catch (Exception $e) {
+                $failureCount++;
+                $results[] = false;
+                Toolbox::logInFile('glpipwa', "GLPI PWA: Exceção ao enviar notificação para dispositivo (users_id: {$device['users_id']}, device_id: {$device['device_id']}): " . $e->getMessage(), LOG_ERR);
             }
         }
 
-        Toolbox::logInFile('glpipwa', "GLPI PWA: Resumo de envio para múltiplos usuários - Sucessos: {$successCount}, Falhas: {$failureCount}, Total: {$totalTokens}", LOG_DEBUG);
+        Toolbox::logInFile('glpipwa', "GLPI PWA: Resumo de envio para múltiplos usuários - Sucessos: {$successCount}, Falhas: {$failureCount}, Total: {$totalDevices}", LOG_DEBUG);
 
         return $results;
     }
@@ -228,7 +281,6 @@ class PluginGlpipwaNotificationPush
             $maskedToken = substr($maskedMessage['message']['token'], 0, 10) . '...' . substr($maskedMessage['message']['token'], -10);
             $maskedMessage['message']['token'] = $maskedToken;
         }
-        Toolbox::logInFile('glpipwa', "GLPI PWA FCM: Enviando mensagem - Payload: " . json_encode($maskedMessage), LOG_DEBUG);
 
         $result = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -312,8 +364,27 @@ class PluginGlpipwaNotificationPush
             }
             
             if ($shouldDeleteToken) {
-                PluginGlpipwaToken::deleteToken($token);
-                Toolbox::logInFile('glpipwa', "GLPI PWA: Token removido devido a erro FCM (UNREGISTERED/NOT_FOUND) - Token: " . substr($token, 0, 20) . "...", LOG_DEBUG);
+                // Tentar remover da nova tabela de dispositivos primeiro
+                if (class_exists('PluginGlpipwaDevice')) {
+                    global $DB;
+                    $iterator = $DB->request([
+                        'FROM' => PluginGlpipwaDevice::getTable(),
+                        'WHERE' => ['fcm_token' => $token],
+                        'LIMIT' => 1,
+                    ]);
+                    foreach ($iterator as $device) {
+                        $deviceObj = new PluginGlpipwaDevice();
+                        if ($deviceObj->getFromDB($device['id'])) {
+                            $deviceObj->delete(['id' => $device['id']]);
+                            Toolbox::logInFile('glpipwa', "GLPI PWA: Dispositivo removido devido a erro FCM (UNREGISTERED/NOT_FOUND) - Device ID: " . $device['device_id'], LOG_DEBUG);
+                        }
+                    }
+                }
+                // Fallback: tentar remover da tabela antiga também (compatibilidade)
+                if (class_exists('PluginGlpipwaToken')) {
+                    PluginGlpipwaToken::deleteToken($token);
+                    Toolbox::logInFile('glpipwa', "GLPI PWA: Token removido devido a erro FCM (UNREGISTERED/NOT_FOUND) - Token: " . substr($token, 0, 20) . "...", LOG_DEBUG);
+                }
             }
             
             return false;
@@ -339,7 +410,6 @@ class PluginGlpipwaNotificationPush
 
         // Sucesso validado - logar resposta (com dados sensíveis mascarados)
         $maskedResponse = $this->maskSensitiveData($response);
-        Toolbox::logInFile('glpipwa', "GLPI PWA FCM: Mensagem enviada com sucesso - Message ID: " . $response['name'] . " - Resposta: " . json_encode($maskedResponse), LOG_DEBUG);
 
         return $response;
     }
@@ -434,14 +504,11 @@ class PluginGlpipwaNotificationPush
     private function detectTicketChange(Ticket $ticket, $previousState = null)
     {
         if ($previousState === null) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA: detectTicketChange - Estado anterior não disponível, retornando 'updated'", LOG_DEBUG);
             return 'updated';
         }
 
         $currentStatus = (int)$ticket->getField('status');
         $previousStatus = isset($previousState['status']) ? (int)$previousState['status'] : null;
-        
-        Toolbox::logInFile('glpipwa', "GLPI PWA: detectTicketChange - Status anterior: {$previousStatus}, Status atual: {$currentStatus}", LOG_DEBUG);
 
         // Verificar se a classe CommonITILObject existe
         if (!class_exists('CommonITILObject')) {
@@ -455,13 +522,11 @@ class PluginGlpipwaNotificationPush
 
         // Detectar fechamento
         if ($previousStatus !== $CLOSED && $currentStatus === $CLOSED) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA: detectTicketChange - Mudança detectada: FECHAMENTO", LOG_DEBUG);
             return 'closed';
         }
 
         // Detectar solução
         if ($previousStatus !== $SOLVED && $currentStatus === $SOLVED) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA: detectTicketChange - Mudança detectada: SOLUÇÃO", LOG_DEBUG);
             return 'solved';
         }
 
@@ -473,12 +538,10 @@ class PluginGlpipwaNotificationPush
         $previousGroup = isset($previousState['groups_id_tech']) ? (int)$previousState['groups_id_tech'] : 0;
 
         if ($currentTech !== $previousTech || $currentGroup !== $previousGroup) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA: detectTicketChange - Mudança detectada: ATRIBUIÇÃO (Técnico: {$previousTech} -> {$currentTech}, Grupo: {$previousGroup} -> {$currentGroup})", LOG_DEBUG);
             return 'assigned';
         }
 
         // Outras atualizações
-        Toolbox::logInFile('glpipwa', "GLPI PWA: detectTicketChange - Mudança detectada: ATUALIZAÇÃO GENÉRICA", LOG_DEBUG);
         return 'updated';
     }
 
@@ -513,7 +576,6 @@ class PluginGlpipwaNotificationPush
     public function notifyTicketUpdate(Ticket $ticket, $previousState = null)
     {
         $ticketId = $ticket->getID();
-        Toolbox::logInFile('glpipwa', "GLPI PWA: notifyTicketUpdate chamado para ticket ID: {$ticketId}", LOG_DEBUG);
         
         // Verificar se Firebase está configurado
         if (!$this->isFirebaseConfigured()) {
@@ -523,7 +585,6 @@ class PluginGlpipwaNotificationPush
 
         // Detectar tipo de mudança
         $changeType = $this->detectTicketChange($ticket, $previousState);
-        Toolbox::logInFile('glpipwa', "GLPI PWA: Tipo de mudança detectado para ticket ID: {$ticketId} - Tipo: {$changeType}", LOG_DEBUG);
 
         // Chamar método específico baseado no tipo de mudança
         switch ($changeType) {
@@ -562,7 +623,6 @@ class PluginGlpipwaNotificationPush
                 break;
         }
 
-        Toolbox::logInFile('glpipwa', "GLPI PWA: Notificação processada para ticket ID: {$ticketId}", LOG_DEBUG);
     }
 
     /**
@@ -876,13 +936,10 @@ class PluginGlpipwaNotificationPush
                     'type' => $OBSERVER_TYPE
                 ]);
                 
-                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando observadores (type={$OBSERVER_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($observers), LOG_DEBUG);
-                
                 foreach ($observers as $obs) {
                     $user_id = $obs['users_id'] ?? null;
                     if ($this->isValidUserId($user_id)) {
                         $recipients[] = (int)$user_id;
-                        Toolbox::logInFile('glpipwa', "GLPI PWA: Observador encontrado: user_id={$user_id} para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                     }
                 }
             } catch (Exception $e) {
@@ -906,13 +963,10 @@ class PluginGlpipwaNotificationPush
                     'type' => $REQUESTER_TYPE
                 ]);
                 
-                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando solicitantes (type={$REQUESTER_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($requesters), LOG_DEBUG);
-                
                 foreach ($requesters as $req) {
                     $user_id = $req['users_id'] ?? null;
                     if ($this->isValidUserId($user_id)) {
                         $recipients[] = (int)$user_id;
-                        Toolbox::logInFile('glpipwa', "GLPI PWA: Solicitante encontrado: user_id={$user_id} para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                     }
                 }
             } catch (Exception $e) {
@@ -936,8 +990,6 @@ class PluginGlpipwaNotificationPush
                     'type' => $OBSERVER_TYPE
                 ]);
                 
-                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando grupos de observadores (type={$OBSERVER_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($observerGroups), LOG_DEBUG);
-                
                 foreach ($observerGroups as $groupTicket) {
                     $group_id = $groupTicket['groups_id'] ?? null;
                     if ($group_id > 0 && class_exists('Group')) {
@@ -945,12 +997,10 @@ class PluginGlpipwaNotificationPush
                             $group = new Group();
                             if ($group->getFromDB($group_id)) {
                                 $groupUsers = Group_User::getGroupUsers($group_id);
-                                Toolbox::logInFile('glpipwa', "GLPI PWA: Grupo de observadores encontrado: group_id={$group_id}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                                 foreach ($groupUsers as $user) {
                                     $user_id = $user['id'] ?? null;
                                     if ($this->isValidUserId($user_id)) {
                                         $recipients[] = (int)$user_id;
-                                        Toolbox::logInFile('glpipwa', "GLPI PWA: Usuário do grupo de observadores encontrado: user_id={$user_id} (grupo {$group_id}) para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                                     }
                                 }
                             }
@@ -982,8 +1032,6 @@ class PluginGlpipwaNotificationPush
                     'type' => $ASSIGN_TYPE
                 ]);
                 
-                Toolbox::logInFile('glpipwa', "GLPI PWA: Buscando grupos atribuídos (type={$ASSIGN_TYPE}) para ticket ID: {$ticket->getID()}, encontrados: " . count($assignedGroups), LOG_DEBUG);
-                
                 foreach ($assignedGroups as $groupTicket) {
                     $group_id = $groupTicket['groups_id'] ?? null;
                     if ($group_id > 0 && class_exists('Group')) {
@@ -991,12 +1039,10 @@ class PluginGlpipwaNotificationPush
                             $group = new Group();
                             if ($group->getFromDB($group_id)) {
                                 $groupUsers = Group_User::getGroupUsers($group_id);
-                                Toolbox::logInFile('glpipwa', "GLPI PWA: Grupo atribuído encontrado: group_id={$group_id}, usuários no grupo: " . count($groupUsers) . " para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                                 foreach ($groupUsers as $user) {
                                     $user_id = $user['id'] ?? null;
                                     if ($this->isValidUserId($user_id)) {
                                         $recipients[] = (int)$user_id;
-                                        Toolbox::logInFile('glpipwa', "GLPI PWA: Usuário do grupo atribuído encontrado: user_id={$user_id} (grupo {$group_id}) para ticket ID: {$ticket->getID()}", LOG_DEBUG);
                                     }
                                 }
                             }
@@ -1034,7 +1080,6 @@ class PluginGlpipwaNotificationPush
         // Filtrar novamente para garantir que todos os valores são válidos
         $finalRecipients = $this->filterValidUserIds($recipients);
         
-        Toolbox::logInFile('glpipwa', "GLPI PWA: Total de destinatários finais para ticket ID: {$ticket->getID()}: " . count($finalRecipients) . " - IDs: " . implode(', ', $finalRecipients), LOG_DEBUG);
         
         return $finalRecipients;
     }
@@ -1048,7 +1093,6 @@ class PluginGlpipwaNotificationPush
     private function getActorTypeConstant(string $constantName): ?int
     {
         if (!class_exists('CommonITILActor')) {
-            Toolbox::logInFile('glpipwa', "GLPI PWA: Classe CommonITILActor não existe, usando valores padrão", LOG_DEBUG);
             return null;
         }
 
@@ -1067,7 +1111,6 @@ class PluginGlpipwaNotificationPush
                 $fullConstantName = "CommonITILActor::{$variation}";
                 if (defined($fullConstantName)) {
                     $value = constant($fullConstantName);
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: Constante {$fullConstantName} encontrada com valor: {$value}", LOG_DEBUG);
                     return (int)$value;
                 }
                 
@@ -1076,7 +1119,6 @@ class PluginGlpipwaNotificationPush
                     $reflection = new ReflectionClass('CommonITILActor');
                     if ($reflection->hasConstant($variation)) {
                         $value = $reflection->getConstant($variation);
-                        Toolbox::logInFile('glpipwa', "GLPI PWA: Constante {$variation} encontrada via reflexão com valor: {$value}", LOG_DEBUG);
                         return (int)$value;
                     }
                 } catch (ReflectionException $e) {

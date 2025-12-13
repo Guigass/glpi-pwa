@@ -36,6 +36,10 @@ if (!defined('GLPI_ROOT')) {
 
 /**
  * Classe para gerenciamento de tokens FCM
+ * 
+ * @deprecated Esta classe está obsoleta e foi substituída por PluginGlpipwaDevice.
+ * Mantida apenas para compatibilidade retroativa com a tabela antiga glpi_plugin_glpipwa_tokens.
+ * Use PluginGlpipwaDevice para todas as novas implementações.
  */
 class PluginGlpipwaToken extends CommonDBTM
 {
@@ -43,6 +47,9 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Retorna o nome da tabela
+     * 
+     * @param string|null $classname Nome da classe (não utilizado, mantido para compatibilidade)
+     * @return string Nome da tabela
      */
     static function getTable($classname = null)
     {
@@ -51,6 +58,9 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Define campos para exibição
+     * 
+     * @param string $interface Interface ('central' ou 'helpdesk')
+     * @return array Direitos disponíveis
      */
     function getRights($interface = 'central')
     {
@@ -59,6 +69,9 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Adiciona um novo token para um usuário
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice::addDevice() ao invés disso.
+     * A funcionalidade foi migrada para o sistema de dispositivos (Device.php) que oferece melhor rastreamento.
      */
     public static function addToken($users_id, $token, $user_agent = null)
     {
@@ -92,14 +105,11 @@ class PluginGlpipwaToken extends CommonDBTM
                 }
                 if ($existing->getField('users_id') != $users_id) {
                     $input['users_id'] = $users_id;
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Atualizando token existente (ID: {$existing->getID()}) para usuário {$users_id}", LOG_DEBUG);
                 } else {
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Token já existe e pertence ao mesmo usuário (ID: {$existing->getID()}, users_id: {$users_id})", LOG_DEBUG);
                 }
                 
                 $result = $existing->update($input);
                 if ($result) {
-                    Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Token atualizado com sucesso (ID: {$existing->getID()})", LOG_DEBUG);
                     return $existing->getID();
                 } else {
                     Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Falha ao atualizar token existente (ID: {$existing->getID()})", LOG_ERR);
@@ -120,7 +130,6 @@ class PluginGlpipwaToken extends CommonDBTM
 
             $result = $tokenObj->add($input);
             if ($result) {
-                Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Novo token criado com sucesso (ID: {$result}, users_id: {$users_id})", LOG_DEBUG);
                 return $result;
             } else {
                 Toolbox::logInFile('glpipwa', "GLPI PWA: addToken - Falha ao criar novo token (users_id: {$users_id})", LOG_ERR);
@@ -137,6 +146,8 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Remove um token
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice para gerenciar dispositivos.
      */
     public static function deleteToken($token)
     {
@@ -149,6 +160,8 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Obtém todos os tokens de um usuário
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice::getUserDevices() ao invés disso.
      */
     public static function getUserTokens($users_id)
     {
@@ -169,6 +182,8 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Obtém todos os tokens de múltiplos usuários
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice::getDevicesForNotification() ao invés disso.
      */
     public static function getUsersTokens(array $users_ids)
     {
@@ -214,6 +229,9 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Remove tokens expirados ou inválidos
+     * 
+     * @deprecated Mantido apenas para compatibilidade retroativa e limpeza da tabela antiga.
+     * A funcionalidade principal foi migrada para PluginGlpipwaDevice.
      */
     public static function cleanExpired($days = 90)
     {
@@ -241,6 +259,8 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Remove tokens de um usuário
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice::deleteUserDevices() ao invés disso.
      */
     public static function deleteUserTokens($users_id)
     {
@@ -264,6 +284,8 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Obtém todos os tokens com informações completas
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice::getAllDevices() ao invés disso.
      */
     public static function getAllTokens()
     {
@@ -291,6 +313,8 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Remove um token por ID
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice::deleteDeviceById() ao invés disso.
      */
     public static function deleteTokenById($id)
     {
@@ -327,6 +351,9 @@ class PluginGlpipwaToken extends CommonDBTM
 
     /**
      * Remove todos os tokens
+     * 
+     * @deprecated Esta classe está obsoleta. Use PluginGlpipwaDevice::deleteAllDevices() ao invés disso.
+     * Mantido apenas para compatibilidade retroativa na interface de administração.
      */
     public static function deleteAllTokens()
     {

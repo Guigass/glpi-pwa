@@ -810,6 +810,88 @@ function plugin_glpipwa_install() {
             $migration->migrationOneTable($table);
         }
 
+        // Criar tabela de dispositivos PWA
+        $devices_table = 'glpi_plugin_glpipwa_devices';
+        
+        if (!$DB->tableExists($devices_table)) {
+            $migration->displayMessage("Criando tabela $devices_table...");
+            
+            $query = "CREATE TABLE `$devices_table` (
+                `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+                `users_id` int UNSIGNED NOT NULL,
+                `device_id` varchar(36) NOT NULL,
+                `fcm_token` TEXT NOT NULL,
+                `user_agent` varchar(255) DEFAULT NULL,
+                `platform` varchar(50) DEFAULT NULL,
+                `last_seen_at` timestamp NULL DEFAULT NULL,
+                `last_seen_ticket_id` int UNSIGNED DEFAULT NULL,
+                `last_seen_ticket_updated_at` timestamp NULL DEFAULT NULL,
+                `date_creation` timestamp NULL DEFAULT NULL,
+                `date_mod` timestamp NULL DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `users_device` (`users_id`, `device_id`),
+                UNIQUE KEY `fcm_token` (`fcm_token`(255)),
+                KEY `users_id` (`users_id`),
+                KEY `last_seen_at` (`last_seen_at`),
+                KEY `last_seen_ticket_id` (`last_seen_ticket_id`),
+                KEY `last_seen_ticket_updated_at` (`last_seen_ticket_updated_at`),
+                KEY `date_mod` (`date_mod`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+            
+            $DB->doQuery($query);
+            $migration->migrationOneTable($devices_table);
+
+            // Migrar dados existentes de glpi_plugin_glpipwa_tokens para glpi_plugin_glpipwa_devices
+            if ($DB->tableExists($table)) {
+                $migration->displayMessage("Migrando dados de $table para $devices_table...");
+                
+                require_once(__DIR__ . '/inc/Device.php');
+                
+                $iterator = $DB->request([
+                    'FROM' => $table,
+                ]);
+
+                $migrated = 0;
+                foreach ($iterator as $row) {
+                    // Gerar device_id UUID v4 para cada token existente
+                    $data_bytes = random_bytes(16);
+                    $data_bytes[6] = chr(ord($data_bytes[6]) & 0x0f | 0x40); // versão 4
+                    $data_bytes[8] = chr(ord($data_bytes[8]) & 0x3f | 0x80); // variante 10
+                    $hex = bin2hex($data_bytes);
+                    $device_id = sprintf(
+                        '%08s-%04s-%04s-%04s-%012s',
+                        substr($hex, 0, 8),
+                        substr($hex, 8, 4),
+                        substr($hex, 12, 4),
+                        substr($hex, 16, 4),
+                        substr($hex, 20, 12)
+                    );
+
+                    // Migrar dados
+                    $result = PluginGlpipwaDevice::addDevice(
+                        $row['users_id'],
+                        $device_id,
+                        $row['token'],
+                        $row['user_agent'],
+                        'web' // platform padrão
+                    );
+
+                    if ($result) {
+                        // Atualizar last_seen_at com date_mod do token (melhor estimativa disponível)
+                        PluginGlpipwaDevice::updateLastSeen(
+                            $row['users_id'],
+                            $device_id,
+                            null, // ticket_id
+                            null  // ticket_updated_at
+                        );
+                        $migrated++;
+                    }
+                }
+
+                $migration->displayMessage("Migração concluída: {$migrated} dispositivo(s) migrado(s)");
+            }
+        }
+
         // Configurações padrão (apenas para chaves que não existem)
         $existing = PluginGlpipwaConfig::getAll();
         $defaults = [
