@@ -175,12 +175,10 @@ if (FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) {
         const messaging = firebase.messaging();
 
         // Handler para mensagens em background
-        // IMPORTANTE SOBRE COMPORTAMENTO DO FCM:
-        // - Mensagens com campo 'notification': O sistema exibe automaticamente quando app está em background
-        //   e NÃO chama onBackgroundMessage. Quando app está em foreground, chama onMessage na página principal.
-        // - Mensagens apenas com 'data': Sempre chamam onBackgroundMessage quando app está em background.
-        // Por isso, este handler pode não ser chamado para mensagens com 'notification' quando app está em background,
-        // mas ainda é necessário para mensagens apenas com 'data' ou para garantir funcionamento.
+        // ESTRATÉGIA DATA-ONLY: Mensagens agora usam apenas message.data (sem message.notification)
+        // O Service Worker é o único responsável por exibir notificações via showNotification()
+        // Isso elimina duplicação que ocorria quando FCM exibia automaticamente + SW também exibia
+        // Referência: https://firebase.google.com/docs/cloud-messaging/concept-options#notifications_and_data_messages
         messaging.onBackgroundMessage((payload) => {
             try {
                 if (!self.registration) {
@@ -188,22 +186,24 @@ if (FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) {
                     return Promise.reject(new Error('self.registration não disponível'));
                 }
 
-                const notificationTitle = payload.notification?.title || 'GLPI';
+                // ESTRATÉGIA DATA-ONLY: Ler title e body de payload.data
+                // Fallback temporário para compatibilidade com payload antigo (com message.notification)
+                // TODO: Remover fallback após migração completa (data de remoção: 2025-06-01)
+                const notificationTitle = payload.data?.title || payload.notification?.title || 'GLPI';
+                const notificationBody = payload.data?.body || payload.notification?.body || '';
                 
-                // Usar notification_id único se disponível, senão criar um baseado em timestamp
-                // CORRIGIDO: usar template literals corretamente (com escape para PHP)
-                const ticketId = payload.data?.ticket_id || 'notification';
-                const timestamp = Date.now();
-                const randomStr = Math.random().toString(36).substr(2, 9);
-                const notificationTag = payload.data?.notification_id || 
-                                       `glpi-\${ticketId}-\${timestamp}-\${randomStr}`;
+                // Usar tag simplificado baseado em ticket_id para substituição de notificações
+                // Tag = "ticket-{ticket_id}" - já é por dispositivo porque é aplicado localmente
+                const ticketId = payload.data?.ticket_id || null;
+                const notificationTag = ticketId ? ('ticket-' + ticketId) : ('notification-' + Date.now());
 
                 const notificationOptions = {
-                    body: payload.notification?.body || '',
-                    icon: payload.notification?.icon || '/pics/glpi.png?v1',
+                    body: notificationBody,
+                    icon: payload.notification?.icon || payload.data?.icon || '/pics/glpi.png?v1',
                     badge: '/pics/glpi.png?v1',
                     data: payload.data || {},
-                    tag: notificationTag, // Tag único para cada notificação
+                    tag: notificationTag, // Tag para substituição de notificações
+                    renotify: false, // Não alertar se substituindo notificação
                     requireInteraction: false,
                     timestamp: Date.now(), // Timestamp para ordenação
                 };
@@ -411,6 +411,7 @@ self.addEventListener('fetch', (event) => {
 // Recebimento de notificações push (fallback APENAS se Firebase não estiver configurado)
 // Se Firebase está configurado, ele processa via onBackgroundMessage acima
 // Não registrar listener push quando Firebase está ativo para evitar duplicação
+// ESTRATÉGIA DATA-ONLY: Ler title e body de data ao invés de notification
 if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) {
     self.addEventListener('push', (event) => {
         try {
@@ -425,21 +426,24 @@ if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) {
                 }
             }
 
-            const title = data.notification?.title || data.title || 'GLPI';
-            
-            // CORRIGIDO: usar template literals corretamente (com escape para PHP)
-            const ticketId = data.data?.ticket_id || 'notification';
-            const timestamp = Date.now();
-            const randomStr = Math.random().toString(36).substr(2, 9);
-            const notificationTag = data.data?.notification_id || 
-                                   `glpi-\${ticketId}-\${timestamp}-\${randomStr}`;
-            
+            // ESTRATÉGIA DATA-ONLY: Ler title e body de data.title e data.body
+            // Fallback temporário para compatibilidade com payload antigo (com notification)
+            // TODO: Remover fallback após migração completa (data de remoção: 2025-06-01)
+            const title = data.data?.title || data.notification?.title || data.title || 'GLPI';
+            const body = data.data?.body || data.notification?.body || data.body || '';
+
+            // Usar tag simplificado baseado em ticket_id para substituição de notificações
+            // Tag = "ticket-{ticket_id}" - já é por dispositivo porque é aplicado localmente
+            const ticketId = data.data?.ticket_id || null;
+            const notificationTag = ticketId ? 'ticket-' + ticketId : 'notification-' + Date.now();
+
             const options = {
-                body: data.notification?.body || data.body || '',
-                icon: data.notification?.icon || '/pics/glpi.png?v1',
+                body: body,
+                icon: data.notification?.icon || data.data?.icon || '/pics/glpi.png?v1',
                 badge: '/pics/glpi.png?v1',
                 data: data.data || {},
-                tag: notificationTag, // Tag único para cada notificação
+                tag: notificationTag, // Tag para substituição de notificações
+                renotify: false, // Não alertar se substituindo notificação
                 requireInteraction: false,
                 timestamp: Date.now(), // Timestamp para ordenação
             };
@@ -469,6 +473,57 @@ self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
     const urlToOpen = event.notification.data?.url || '/';
+    const ticketId = event.notification.data?.ticket_id;
+
+    // Função para atualizar last_seen_at
+    function updateLastSeen(deviceId, ticketId) {
+        if (!deviceId) {
+            return Promise.resolve();
+        }
+
+        // Obter token CSRF via mensagem para o cliente
+        return clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true,
+        })
+        .then((windowClients) => {
+            if (windowClients.length === 0) {
+                return Promise.resolve();
+            }
+
+            // Enviar mensagem para o cliente para obter CSRF token e device_id
+            const client = windowClients[0];
+            return client.postMessage({
+                type: 'GET_CSRF_TOKEN',
+                action: 'update_last_seen',
+                ticket_id: ticketId
+            });
+        })
+        .catch((error) => {
+            // Silenciosamente ignora erros
+            return Promise.resolve();
+        });
+    }
+
+    // Tentar obter device_id do localStorage via mensagem para o cliente
+    // Se não conseguir, continuar sem atualizar last_seen
+    clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+    })
+    .then((windowClients) => {
+        if (windowClients.length > 0) {
+            // Enviar mensagem para o cliente para atualizar last_seen
+            const client = windowClients[0];
+            client.postMessage({
+                type: 'UPDATE_LAST_SEEN',
+                ticket_id: ticketId
+            });
+        }
+    })
+    .catch(() => {
+        // Silenciosamente ignora erros
+    });
 
     event.waitUntil(
         clients.matchAll({
@@ -487,7 +542,7 @@ self.addEventListener('notificationclick', (event) => {
                     });
                 }
             }
-            
+
             // Se não houver janela aberta, abrir uma nova
             if (clients.openWindow) {
                 return clients.openWindow(urlToOpen);

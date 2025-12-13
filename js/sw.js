@@ -60,7 +60,7 @@ function isStaticFile(url) {
     const urlLower = url.toLowerCase();
     const urlObj = new URL(url);
     const pathname = urlObj.pathname.toLowerCase();
-    
+
     // Extensões de arquivos estáticos
     const staticExtensions = [
         '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico',
@@ -70,23 +70,23 @@ function isStaticFile(url) {
         '.json', '.xml', '.txt', // Dados
         '.map' // Source maps
     ];
-    
+
     // Verificar extensão do arquivo
     const hasStaticExtension = staticExtensions.some(ext => pathname.endsWith(ext));
-    
+
     // Verificar paths comuns de arquivos estáticos
     const staticPaths = [
         '/pics/', '/css/', '/js/', '/lib/', '/vendor/',
         '/public/', '/assets/', '/static/', '/dist/', '/build/',
         '/fonts/', '/images/', '/img/', '/media/'
     ];
-    
+
     const hasStaticPath = staticPaths.some(path => pathname.includes(path));
-    
+
     // Verificar se é um arquivo de plugin estático
-    const isPluginStatic = pathname.includes('/plugins/') && 
-                          (hasStaticExtension || hasStaticPath);
-    
+    const isPluginStatic = pathname.includes('/plugins/') &&
+        (hasStaticExtension || hasStaticPath);
+
     return hasStaticExtension || hasStaticPath || isPluginStatic;
 }
 
@@ -124,7 +124,7 @@ self.addEventListener('fetch', (event) => {
     if (!requestUrl.startsWith(self.location.origin)) {
         return;
     }
-    
+
     // INTERCEPTAR APENAS ARQUIVOS ESTÁTICOS
     // Deixar todas as outras requisições (PHP, AJAX, etc.) passarem direto
     if (!isStaticFile(requestUrl)) {
@@ -174,6 +174,8 @@ self.addEventListener('fetch', (event) => {
 });
 
 // Recebimento de notificações push
+// ESTRATÉGIA DATA-ONLY: Ler title e body de data ao invés de notification
+// Este handler é usado como fallback quando Firebase não está configurado
 self.addEventListener('push', (event) => {
     let data = {};
 
@@ -185,19 +187,24 @@ self.addEventListener('push', (event) => {
         }
     }
 
-    const title = data.notification?.title || data.title || 'GLPI';
-    
-    // Usar notification_id único se disponível, senão criar um baseado em timestamp
-    // Isso garante que cada notificação seja exibida separadamente
-    const notificationTag = data.data?.notification_id || 
-                           `glpi-${data.data?.ticket_id || 'notification'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+    // ESTRATÉGIA DATA-ONLY: Ler title e body de data.title e data.body
+    // Fallback temporário para compatibilidade com payload antigo (com notification)
+    // TODO: Remover fallback após migração completa (data de remoção: 2025-06-01)
+    const title = data.data?.title || data.notification?.title || data.title || 'GLPI';
+    const body = data.data?.body || data.notification?.body || data.body || '';
+
+    // Usar tag simplificado baseado em ticket_id para substituição de notificações
+    // Tag = "ticket-{ticket_id}" - já é por dispositivo porque é aplicado localmente
+    const ticketId = data.data?.ticket_id || null;
+    const notificationTag = ticketId ? ('ticket-' + ticketId) : ('notification-' + Date.now());
+
     const options = {
-        body: data.notification?.body || data.body || '',
-        icon: data.notification?.icon || '/pics/glpi.png?v1',
+        body: body,
+        icon: data.notification?.icon || data.data?.icon || '/pics/glpi.png?v1',
         badge: '/pics/glpi.png?v1',
         data: data.data || {},
-        tag: notificationTag, // Tag único para cada notificação
+        tag: notificationTag, // Tag para substituição de notificações
+        renotify: false, // Não alertar se substituindo notificação
         requireInteraction: false,
         timestamp: Date.now(), // Timestamp para ordenação
     };

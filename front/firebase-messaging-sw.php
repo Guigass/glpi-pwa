@@ -73,20 +73,29 @@ if (FIREBASE_CONFIG.apiKey) {
     firebase.initializeApp(FIREBASE_CONFIG);
     const messaging = firebase.messaging();
 
+    // ESTRATÉGIA DATA-ONLY: Mensagens agora usam apenas message.data (sem message.notification)
+    // O Service Worker é o único responsável por exibir notificações via showNotification()
+    // Isso elimina duplicação que ocorria quando FCM exibia automaticamente + SW também exibia
+    // Referência: https://firebase.google.com/docs/cloud-messaging/concept-options#notifications_and_data_messages
     messaging.onBackgroundMessage((payload) => {
-        const notificationTitle = payload.notification?.title || 'GLPI';
+        // ESTRATÉGIA DATA-ONLY: Ler title e body de payload.data
+        // Fallback temporário para compatibilidade com payload antigo (com message.notification)
+        // TODO: Remover fallback após migração completa (data de remoção: 2025-06-01)
+        const notificationTitle = payload.data?.title || payload.notification?.title || 'GLPI';
+        const notificationBody = payload.data?.body || payload.notification?.body || '';
         
-        // Usar notification_id único se disponível, senão criar um baseado em timestamp
-        // Isso garante que cada notificação seja exibida separadamente
-        const notificationTag = payload.data?.notification_id || 
-                               `glpi-${payload.data?.ticket_id || 'notification'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // Usar tag simplificado baseado em ticket_id para substituição de notificações
+        // Tag = "ticket-{ticket_id}" - já é por dispositivo porque é aplicado localmente
+        const ticketId = payload.data?.ticket_id || null;
+        const notificationTag = ticketId ? ('ticket-' + ticketId) : ('notification-' + Date.now());
         
         const notificationOptions = {
-            body: payload.notification?.body || '',
-            icon: payload.notification?.icon || '/pics/glpi.png?v1',
+            body: notificationBody,
+            icon: payload.notification?.icon || payload.data?.icon || '/pics/glpi.png?v1',
             badge: '/pics/glpi.png?v1',
             data: payload.data || {},
-            tag: notificationTag, // Tag único para cada notificação
+            tag: notificationTag, // Tag para substituição de notificações
+            renotify: false, // Não alertar se substituindo notificação
             requireInteraction: false,
             timestamp: Date.now(), // Timestamp para ordenação
         };

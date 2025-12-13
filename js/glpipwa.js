@@ -157,6 +157,68 @@
      */
     const FCM_TOKEN_STORAGE_KEY = 'glpipwa_fcm_token';
     const FCM_TOKEN_TIMESTAMP_KEY = 'glpipwa_fcm_token_timestamp';
+    const DEVICE_ID_STORAGE_KEY = 'glpipwa_device_id';
+
+    /**
+     * Gera ou obtém device_id do localStorage
+     * Usa crypto.randomUUID() se disponível, senão usa crypto.getRandomValues() com RFC 4122
+     * 
+     * @return {string} UUID v4 do dispositivo
+     */
+    function getOrCreateDeviceId() {
+        try {
+            if (typeof Storage !== 'undefined' && localStorage) {
+                let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+
+                if (!deviceId) {
+                    // Usar crypto.randomUUID() se disponível (MDN: https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID)
+                    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                        deviceId = crypto.randomUUID();
+                    } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                        // Fallback: gerar UUID v4 usando crypto.getRandomValues() (RFC 4122)
+                        // Referência: https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues
+                        const array = new Uint8Array(16);
+                        crypto.getRandomValues(array);
+
+                        // Ajustar versão (4) e variante (10)
+                        array[6] = (array[6] & 0x0f) | 0x40; // versão 4
+                        array[8] = (array[8] & 0x3f) | 0x80; // variante 10
+
+                        // Converter para string UUID format
+                        const hex = Array.from(array, (byte) =>
+                            byte.toString(16).padStart(2, '0')
+                        ).join('');
+                        deviceId = [
+                            hex.slice(0, 8),
+                            hex.slice(8, 12),
+                            hex.slice(12, 16),
+                            hex.slice(16, 20),
+                            hex.slice(20, 32),
+                        ].join('-');
+                    } else {
+                        // Fallback final: gerar UUID-like (não é RFC 4122, mas melhor que nada)
+                        deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                            const r = Math.random() * 16 | 0;
+                            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
+                    }
+                    localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
+                }
+
+                return deviceId;
+            }
+        } catch (e) {
+            console.warn('[GLPI PWA] Não foi possível acessar localStorage para device_id:', e);
+        }
+
+        // Fallback: gerar UUID temporário (não será persistido)
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
 
     /**
      * Obtém o token FCM armazenado no localStorage
@@ -204,6 +266,40 @@
         } catch (e) {
             // localStorage pode não estar disponível
             console.warn('[GLPI PWA] Não foi possível limpar token do localStorage:', e);
+        }
+    }
+
+    /**
+     * Remove device_id do localStorage
+     * Usado quando o dispositivo não é mais encontrado no servidor
+     * Isso força a geração de um novo device_id na próxima vez que getOrCreateDeviceId() for chamado
+     */
+    function clearStoredDeviceId() {
+        try {
+            if (typeof Storage !== 'undefined' && localStorage) {
+                const oldDeviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+
+                // Limpar device_id
+                localStorage.removeItem(DEVICE_ID_STORAGE_KEY);
+
+                // Limpar token FCM e timestamp
+                const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+                if (storedToken) {
+                    localStorage.removeItem(FCM_TOKEN_STORAGE_KEY);
+                    localStorage.removeItem(FCM_TOKEN_TIMESTAMP_KEY);
+
+                    // Limpar estado do token (glpipwa_token_state_{token})
+                    const registrationStateKey = 'glpipwa_token_state_' + storedToken;
+                    localStorage.removeItem(registrationStateKey);
+
+                    console.info('[GLPI PWA] device_id, token FCM e estado removidos do localStorage (dispositivo não encontrado no servidor). Um novo será gerado na próxima vez.', oldDeviceId ? `Device ID anterior: ${oldDeviceId}` : '');
+                } else {
+                    console.info('[GLPI PWA] device_id removido do localStorage (dispositivo não encontrado no servidor). Um novo será gerado na próxima vez.', oldDeviceId ? `Device ID anterior: ${oldDeviceId}` : '');
+                }
+            }
+        } catch (e) {
+            // localStorage pode não estar disponível
+            console.warn('[GLPI PWA] Não foi possível limpar dados do localStorage:', e);
         }
     }
 
@@ -772,44 +868,24 @@
             });
 
         // Listener para mensagens em foreground
-        // IMPORTANTE: Quando o app está em foreground, mensagens com campo 'notification'
-        // chamam onMessage aqui (não no Service Worker). O onBackgroundMessage só é chamado
-        // quando o app está em background E a mensagem NÃO tem campo 'notification'
+        // ESTRATÉGIA DATA-ONLY: Não exibir notificação quando app está em foreground
+        // Com data-only, mensagens em foreground não devem exibir notificação para evitar
+        // interrupção do usuário. O Service Worker exibirá quando app estiver em background.
+        // Opcionalmente, pode-se atualizar badge/contador aqui (feature futura).
+        // Referência: https://firebase.google.com/docs/cloud-messaging/js/receive#handle_messages_when_your_web_app_is_in_the_foreground
         try {
             messaging.onMessage((payload) => {
-                // Exibir notificação mesmo com app aberto
-                if (payload.notification && Notification.permission === 'granted') {
-                    const notificationTitle = payload.notification.title || 'GLPI';
-                    const notificationBody = payload.notification.body || '';
+                // ESTRATÉGIA DATA-ONLY: Não exibir notificação em foreground
+                // Apenas logar para debug (pode ser removido em produção)
+                // TODO: Implementar atualização de badge/contador se necessário (feature futura)
 
-                    // Criar tag único similar ao Service Worker
-                    const ticketId = payload.data?.ticket_id || 'notification';
-                    const timestamp = Date.now();
-                    const randomStr = Math.random().toString(36).substr(2, 9);
-                    const notificationTag = payload.data?.notification_id ||
-                        `glpi-${ticketId}-${timestamp}-${randomStr}`;
+                // Fallback temporário para compatibilidade com payload antigo (com message.notification)
+                // TODO: Remover fallback após migração completa (data de remoção: 2025-06-01)
+                const hasDataOnly = payload.data?.title && payload.data?.body;
+                const hasLegacyNotification = payload.notification?.title && payload.notification?.body;
 
-                    const notificationOptions = {
-                        body: notificationBody,
-                        icon: payload.notification.icon || '/pics/glpi.png?v1',
-                        badge: '/pics/glpi.png?v1',
-                        data: payload.data || {},
-                        tag: notificationTag,
-                        requireInteraction: false,
-                        timestamp: timestamp,
-                    };
-
-                    try {
-                        new Notification(notificationTitle, notificationOptions);
-                    } catch (error) {
-                        console.error('[GLPI PWA] Erro ao exibir notificação em foreground', error);
-                    }
-                } else {
-                    console.warn('[GLPI PWA] Mensagem em foreground sem notification ou sem permissão', {
-                        hasNotification: !!payload.notification,
-                        permission: Notification.permission
-                    });
-                }
+                // Não exibir notificação - usuário já está usando o app
+                // Em versões futuras, pode-se atualizar badge/contador aqui
             });
         } catch (error) {
             console.error('[GLPI PWA] Erro ao registrar onMessage', error);
@@ -870,8 +946,10 @@
         // Primeiro obter token CSRF fresco
         return getNewCSRFToken()
             .then((csrfToken) => {
+                const deviceId = getOrCreateDeviceId();
                 const data = {
                     token: token,
+                    device_id: deviceId,
                     user_agent: navigator.userAgent,
                     _glpi_csrf_token: csrfToken
                 };
@@ -903,17 +981,19 @@
                     // Tentar obter detalhes do erro
                     return response.text().then((text) => {
                         console.error('[GLPI PWA] registerToken: Resposta de erro (texto):', text);
+                        // Tentar parsear JSON para obter mensagem de erro específica
+                        let errorMessage = response.statusText;
                         try {
                             const errorData = JSON.parse(text);
-                            const errorMessage = errorData.error || errorData.message || response.statusText;
-                            console.error('[GLPI PWA] Erro ao registrar token:', response.status, errorMessage);
-                            throw new Error(errorMessage);
+                            errorMessage = errorData.error || errorData.message || response.statusText;
                         } catch (parseError) {
                             // Se não conseguir parsear JSON, usar statusText
-                            console.error('[GLPI PWA] Erro ao registrar token:', response.status, response.statusText);
-                            console.error('[GLPI PWA] Resposta completa:', text);
-                            throw new Error('Erro ' + response.status + ': ' + response.statusText);
+                            // parseError é um SyntaxError do JSON.parse, não um erro intencional
+                            console.error('[GLPI PWA] registerToken: Erro ao parsear JSON de erro:', parseError);
                         }
+                        console.error('[GLPI PWA] Erro ao registrar token:', response.status, errorMessage);
+                        console.error('[GLPI PWA] Resposta completa:', text);
+                        throw new Error(errorMessage);
                     });
                 }
                 return response.text().then((text) => {
@@ -927,6 +1007,14 @@
             })
             .then((result) => {
                 if (result && result.success) {
+                    // Se o servidor retornou um device_id (gerado no servidor), armazenar no localStorage
+                    if (result.device_id && typeof result.device_id === 'string') {
+                        try {
+                            localStorage.setItem(DEVICE_ID_STORAGE_KEY, result.device_id);
+                        } catch (e) {
+                            console.warn('[GLPI PWA] Não foi possível armazenar device_id retornado pelo servidor:', e);
+                        }
+                    }
                     return true;
                 } else {
                     const errorMsg = result?.error || result?.message || 'Resposta sem sucesso';
@@ -943,15 +1031,151 @@
             });
     }
 
+    /**
+     * Atualiza last_seen_at quando GLPI é aberto
+     * Se a URL contém ticket_id ou ticketId é fornecido como parâmetro, também atualiza last_seen_ticket_id e last_seen_ticket_updated_at
+     * 
+     * @param {number|null} ticketIdFromParam - ticket_id opcional (ex: da notificação clicada). Se fornecido, usa este ao invés de ler da URL
+     */
+    function updateLastSeen(ticketIdFromParam = null) {
+        const deviceId = getOrCreateDeviceId();
+        if (!deviceId) {
+            return;
+        }
+
+        // Usar ticket_id do parâmetro se fornecido, senão verificar se URL contém ticket_id
+        let ticketId = ticketIdFromParam;
+        if (ticketId === null) {
+            const urlParams = new URLSearchParams(window.location.search);
+            ticketId = urlParams.get('id');
+        }
+
+        // Verificar se estamos em uma página de ticket ou se ticketId foi fornecido
+        const isTicketPage = (window.location.pathname.includes('/front/ticket.form.php') && ticketId) || ticketIdFromParam !== null;
+
+        // Obter token CSRF
+        getNewCSRFToken()
+            .then((csrfToken) => {
+                const pluginUrl = getPluginUrl();
+                const data = {
+                    device_id: deviceId,
+                    _glpi_csrf_token: csrfToken
+                };
+
+                // Se estamos em uma página de ticket ou ticketId foi fornecido, incluir ticket_id
+                if (isTicketPage && ticketId) {
+                    data.ticket_id = parseInt(ticketId, 10);
+                }
+
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-Glpi-Csrf-Token': csrfToken
+                };
+
+                const updateUrl = pluginUrl + '/front/update-last-seen.php';
+
+                return fetch(updateUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: headers,
+                    body: JSON.stringify(data)
+                });
+            })
+            .then((response) => {
+                if (!response.ok) {
+                    // Se for 404, significa que o dispositivo não foi encontrado no servidor
+                    // Limpar device_id do localStorage para que um novo seja gerado na próxima vez
+                    if (response.status === 404) {
+                        console.warn('[GLPI PWA] Dispositivo não encontrado no servidor (404). Limpando device_id do localStorage para gerar um novo.');
+                        clearStoredDeviceId();
+                        // Tentar parsear JSON para log adicional, mas não é crítico
+                        return response.json().catch(() => null).then((errorData) => {
+                            if (errorData && errorData.code === 'DEVICE_NOT_FOUND') {
+                                console.info('[GLPI PWA] Código de erro confirmado: DEVICE_NOT_FOUND');
+                            }
+                            return null;
+                        });
+                    }
+                    console.warn('[GLPI PWA] Erro ao atualizar last_seen:', response.status);
+                    return null;
+                }
+                return response.json();
+            })
+            .then((result) => {
+                if (result && result.success) {
+                    // Sucesso - silenciosamente ignora
+                } else if (result && !result.success) {
+                    // Verificar se é erro de dispositivo não encontrado (caso não tenha sido tratado acima)
+                    if (result.code === 'DEVICE_NOT_FOUND' || result.error === 'Dispositivo não encontrado') {
+                        console.warn('[GLPI PWA] Dispositivo não encontrado no servidor. Limpando device_id do localStorage.');
+                        clearStoredDeviceId();
+                    } else {
+                        console.warn('[GLPI PWA] Falha ao atualizar last_seen:', result);
+                    }
+                }
+            })
+            .catch((error) => {
+                // Silenciosamente ignora erros (pode não estar autenticado ainda, etc)
+            });
+    }
+
+    /**
+     * Fecha todas as notificações do Service Worker quando GLPI é aberto
+     */
+    function closeAllNotifications() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then((registration) => {
+                registration.getNotifications().then((notifications) => {
+                    notifications.forEach((notification) => {
+                        notification.close();
+                    });
+                });
+            }).catch((error) => {
+                // Silenciosamente ignora erros
+            });
+        }
+    }
+
     // Executar quando o DOM estiver pronto
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () {
             injectManifest();
             registerServiceWorker();
+
+            // Aguardar um pouco para garantir que a sessão está carregada
+            setTimeout(() => {
+                updateLastSeen();
+                closeAllNotifications();
+            }, 1000);
         });
     } else {
         injectManifest();
         registerServiceWorker();
+
+        // Aguardar um pouco para garantir que a sessão está carregada
+        setTimeout(() => {
+            updateLastSeen();
+            closeAllNotifications();
+        }, 1000);
+    }
+
+    // Atualizar last_seen quando a página é focada (usuário volta para a aba)
+    window.addEventListener('focus', () => {
+        updateLastSeen();
+    });
+
+    // Listener para mensagens do Service Worker (para atualizar last_seen quando notificação é clicada)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'UPDATE_LAST_SEEN') {
+                const ticketId = event.data.ticket_id;
+                // Usar ticket_id da notificação ao invés de ler da URL
+                // Isso garante que o ticket correto seja marcado como visualizado
+                updateLastSeen(ticketId ? parseInt(ticketId, 10) : null);
+            }
+        });
     }
 })();
 
